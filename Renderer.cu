@@ -4,7 +4,6 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-#define ONED 0.017453f
 
 __device__ float intersection(float3 rayOrigin, float3 rayDirection, float distance,float3 position, float radius)
 {
@@ -37,8 +36,6 @@ __device__ float intersection(float3 rayOrigin, float3 rayDirection, float dista
 	}
 
 	return t;
-	
-
 }
 
 __device__ bool shadowed(float3 rayOrigin, float3 rayDirection, float distance,float3 position, float radius)
@@ -113,7 +110,7 @@ struct CameraInfo
 };
 
 /*
-	
+	Just testing
 */
 Sphere* slist;
 Sphere* devslist;
@@ -191,13 +188,7 @@ void Renderer::setProjectionMode(bool orthographic)
 
 __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scount, int& out, float adx)
 {
-//	float3 circpos = {0, 0 ,0};
 	float3 lightPos = {0 +50*__cosf(adx), 50*__sinf(adx), -60};
-
-//	*__sinf(adx)
-
-//	float3 pos = {0, 1, 10};
-
 
 	float d = -1;
 	int snum = -1;
@@ -215,8 +206,6 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 
 	if(d > 0)
 	{
-	//	out |= 0x3F0000;
-		
 		float3 contactPoint = start +direction*d;
 
 		float3 cray = getRayDirection(contactPoint, lightPos);
@@ -226,10 +215,7 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 		float intensity = lambert(cray, snorm);	//Compute lambert intensity
 
 		for(int i = 0; i < scount; i++)
-		{
-			//dot(contactPoint - lightPos)
-
-															
+		{												
 			if(slist[i].sshadowed(contactPoint, cray, dot(contactPoint - lightPos))	) //add ray length parameter, for shadows ray length is distance to light
 			{
 				out = rgb(0xFF, 0xFF, 0xFF, intensity);	//Color in light
@@ -246,37 +232,7 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 	{
 		out = 0x222222;		//Background color
 	}
-
-
 }
-
-/*
-
-float dd = dot(contactPoint - lightPos);
-
-			d = slist[i].sshadowed(contactPoint, cray, dd);			//add ray length parameter, for shadows ray length is distance to light
-			if(d >= dd || d < -0.5)
-			{
-				if(false)
-				{
-					out = 0xFF0000;
-				}
-				else
-				{
-				out = rgb(0xFF, 0xFF, 0xFF, intensity);	//Color in light
-				}
-			}
-			else
-			{
-				out = 0x000000;		//Color in shadow
-				break;
-			}
-
-*/
-
-
-
-
 
 
 __global__ void render(int width, int height, float3 cameraPos, Sphere* slist, int scount, int* out, float adx, float ady)
@@ -311,18 +267,8 @@ void Renderer::renderFrame(int width, int height, int* pixels)
 	int numElements = width*height;
 	int size = sizeof(pixels[0]) * numElements;
 
-
-	/*
-		//x and y values related to width and height
-		
-		dim3 numBlocks			
-		dim3 numThreads
-	*/
 	 adx += 0.003f;
 	 ady += 0.003f;
-
-
-	
 
 	int numBlocks = (numElements + width-1) / width;
 
