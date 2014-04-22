@@ -21,9 +21,6 @@
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Timer.cpp" />
-    <CudaCompile Include="Light.cu">
-      <FastMath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</FastMath>
-    </CudaCompile>
     <CudaCompile Include="Renderer.cu">
       <FileType>CppCode</FileType>
       <GenerateRelocatableDeviceCode Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</GenerateRelocatableDeviceCode>
@@ -34,7 +31,6 @@
     <ClInclude Include="Timer.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Light.cuh" />
     <None Include="MathOps.cuh" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

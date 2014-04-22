@@ -237,14 +237,37 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 
 __global__ void render(int width, int height, float3 cameraPos, Sphere* slist, int scount, int* out, float adx, float ady)
 {
-	int i = blockIdx.x * blockDim.x + threadIdx.x;	
+	int x = blockDim.x * blockIdx.x + threadIdx.x;
+	int y = blockDim.y * blockIdx.y + threadIdx.y;
 
-	float norx = (threadIdx.x - 0.5*width)/(0.5*width);
-	float nory = -(blockIdx.x - 0.5*height)/(0.5*height);
-
-
-	if(i < width*height)
+	if(x < width && y < height)
 	{
+		int i= y * width + x;
+
+		/*
+			Normalize the values.
+			The smaller of the two (width or height) is normalized to a range [-1, 1]
+			The larger of the two is normalized depending on the value of the smaller
+
+			Both are normalized to the range [-1, 1] if they are the same
+		*/
+
+		float norx;
+		float nory;
+
+		if(width < height)
+		{
+			norx = (x - 0.5*width)/(0.5*width);
+			nory = -(y - 0.5*height)/(0.5*width);
+		}
+		else
+		{
+			norx = (x - 0.5*width)/(0.5*height);
+			nory = -(y - 0.5*height)/(0.5*height);
+		}
+
+		
+
 		out[i] = 0;
 
 		float3 dir = {norx, nory, 1};	//Screen location
@@ -270,11 +293,18 @@ void Renderer::renderFrame(int width, int height, int* pixels)
 	 adx += 0.003f;
 	 ady += 0.003f;
 
-	int numBlocks = (numElements + width-1) / width;
-
 	float3 cameraPos = {0, 0, 0};
 
-	render<<< numBlocks, width >>>(width, height, cameraPos, devslist, tcount, devPixels,  adx,  ady);
+
+	dim3 blockSize(16, 16); //16 * 16 threads per block
+
+	int xGridSize = (width + blockSize.x-1)/blockSize.x; 
+	int yGridSize = (height + blockSize.y-1)/blockSize.y;
+
+	dim3 gridSize( xGridSize, yGridSize);
+
+
+	render<<< gridSize, blockSize >>>(width, height, cameraPos, devslist, tcount, devPixels,  adx,  ady);
 
 	cudaMemcpy(pixels, devPixels, size, cudaMemcpyDeviceToHost);
 }

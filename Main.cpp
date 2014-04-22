@@ -3,14 +3,14 @@
 #include "Renderer.cuh"
 #include "Timer.h"
 
-#define WIDTH 512
-#define HEIGHT 512
+#define WIDTH 1280
+#define HEIGHT 720
 
-HWND hWnd;
+HWND hwnd;
 HDC hdc;
 WNDCLASSEX wc;
 
-LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
 int run(HINSTANCE &hinstance);
 
 int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hiprev, LPSTR cmd, int cmdShow)
@@ -22,34 +22,34 @@ int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hiprev, LPSTR cmd, int cmdShow
     wc.lpfnWndProc = WindowProc;
     wc.hInstance = hinstance;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.lpszClassName = "WindowClass";
+    wc.lpszClassName = "RayTracing";
 
     RegisterClassEx(&wc);
 
-	RECT wr = {0, 0, WIDTH, HEIGHT};
+	RECT windowRect = {0, 0, WIDTH, HEIGHT};
 	
-    AdjustWindowRect(&wr, WS_OVERLAPPEDWINDOW, FALSE);
+    AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
-    hWnd = CreateWindowEx(NULL,
-                          "WindowClass",
+    hwnd = CreateWindowEx(NULL,
+                          wc.lpszClassName,
                           "Ray Tracing",
                           WS_OVERLAPPEDWINDOW,
                           300,
                           300,
-                          wr.right - wr.left,
-                          wr.bottom - wr.top,
+                          windowRect.right - windowRect.left,
+                          windowRect.bottom - windowRect.top,
                           NULL,
                           NULL,
 						  hinstance,
                           NULL);
 
-	hdc = GetDC(hWnd);
+	hdc = GetDC(hwnd);
 
-    ShowWindow(hWnd, cmdShow);
+    ShowWindow(hwnd, cmdShow);
 
 	int result = run(hinstance);
 
-	ReleaseDC(hWnd, hdc);
+	ReleaseDC(hwnd, hdc);
 
 	return result;
 }
@@ -96,11 +96,10 @@ int run(HINSTANCE &hinstance)
     }
 
 	 return msg.wParam;
-	
 }
 
 
-LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch(message)
     {
@@ -112,5 +111,5 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
             }
     }
 
-    return DefWindowProc (hWnd, message, wParam, lParam);
+    return DefWindowProc (hwnd, message, wParam, lParam);
 }
