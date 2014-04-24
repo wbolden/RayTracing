@@ -296,7 +296,7 @@ void Renderer::renderFrame(int width, int height, int* pixels)
 	float3 cameraPos = {0, 0, 0};
 
 
-	dim3 blockSize(16, 16); //16 * 16 threads per block
+	dim3 blockSize(16,16); //16 * 16 threads per block
 
 	int xGridSize = (width + blockSize.x-1)/blockSize.x; 
 	int yGridSize = (height + blockSize.y-1)/blockSize.y;

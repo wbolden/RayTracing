@@ -83,6 +83,7 @@ int run(HINSTANCE &hinstance)
 		render.renderFrame(WIDTH, HEIGHT, pixels);
 
 		HBITMAP frame = CreateBitmap(WIDTH, HEIGHT, 1, sizeof(int)*8, pixels);
+
 		if(frame != NULL)
 		{
 			DrawState(hdc, NULL, NULL, (LPARAM)frame, NULL, 0, 0, 0, 0, DST_BITMAP);
