@@ -4,23 +4,20 @@
     <CudaCompile Include="Renderer.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Main.cpp">
-      <Filter>Windows</Filter>
-    </ClCompile>
     <ClCompile Include="Timer.cpp">
       <Filter>Utilities</Filter>
     </ClCompile>
+    <ClCompile Include="Display.cpp" />
+    <ClCompile Include="Main.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Renderer.cuh" />
     <ClInclude Include="Timer.h">
       <Filter>Utilities</Filter>
     </ClInclude>
+    <ClInclude Include="Display.h" />
   </ItemGroup>
   <ItemGroup>
-    <Filter Include="Windows">
-      <UniqueIdentifier>{2a36795b-f44c-4404-bb79-7003bf572223}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Utilities">
       <UniqueIdentifier>{4fd7f536-3768-4f7c-bd2e-d00366ba0bac}</UniqueIdentifier>
     </Filter>

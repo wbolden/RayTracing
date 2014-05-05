@@ -5,6 +5,7 @@
 #include "device_launch_parameters.h"
 
 
+
 __device__ float intersection(float3 rayOrigin, float3 rayDirection, float distance,float3 position, float radius)
 {
 	float3 dist = position - rayOrigin;
@@ -167,17 +168,20 @@ Renderer::Renderer(void)
 	cudaMemcpy(devslist, slist, tcount * sizeof(Sphere), cudaMemcpyHostToDevice);
 }
 
+dim3 blockSize;
+dim3 gridSize;
+
 void Renderer::setResolution(int width, int height)
 {
-	if(devPixels == nullptr)
-	{
-		cudaMalloc((void**)&devPixels, width*height*sizeof(int));
-	}
-	else
-	{
-		cudaFree(devPixels);
-		cudaMalloc((void**)&devPixels, width*height*sizeof(int));
-	}
+	blockSize = dim3(16,16); //16 * 16 threads per block
+
+	int xGridSize = (width + blockSize.x-1)/blockSize.x; 
+	int yGridSize = (height + blockSize.y-1)/blockSize.y;
+
+	gridSize = dim3( xGridSize, yGridSize);
+
+	rwidth = width;
+	rheight = height;
 }
 
 void Renderer::setProjectionMode(bool orthographic)
@@ -186,7 +190,7 @@ void Renderer::setProjectionMode(bool orthographic)
 }
 
 
-__device__ void castRay(float3 start, float3 direction, Sphere* slist, int scount, int& out, float adx)
+__device__ void castRay(float3 start, float3 direction, Sphere* slist, int scount, unsigned int& out, float adx)
 {
 	float3 lightPos = {0 +50*__cosf(adx), 50*__sinf(adx), -60};
 
@@ -235,14 +239,14 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 }
 
 
-__global__ void render(int width, int height, float3 cameraPos, Sphere* slist, int scount, int* out, float adx, float ady)
+__global__ void render(int width, int height, float3 cameraPos, Sphere* slist, int scount, cudaSurfaceObject_t out, float adx, float ady)
 {
 	int x = blockDim.x * blockIdx.x + threadIdx.x;
 	int y = blockDim.y * blockIdx.y + threadIdx.y;
 
 	if(x < width && y < height)
 	{
-		int i= y * width + x;
+	//	int i= y * width + x;
 
 		/*
 			Normalize the values.
@@ -258,17 +262,17 @@ __global__ void render(int width, int height, float3 cameraPos, Sphere* slist, i
 		if(width < height)
 		{
 			norx = (x - 0.5*width)/(0.5*width);
-			nory = -(y - 0.5*height)/(0.5*width);
+			nory = (y - 0.5*height)/(0.5*width);
 		}
 		else
 		{
 			norx = (x - 0.5*width)/(0.5*height);
-			nory = -(y - 0.5*height)/(0.5*height);
+			nory = (y - 0.5*height)/(0.5*height);
 		}
 
 		
 
-		out[i] = 0;
+		unsigned int result = 0;
 
 		float3 dir = {norx, nory, 1};	//Screen location
 
@@ -276,7 +280,10 @@ __global__ void render(int width, int height, float3 cameraPos, Sphere* slist, i
 
 		float3 pos = {-0, -10, -70};
 
-		castRay(cameraPos + pos, dir, slist, scount, out[i], adx);
+		castRay(cameraPos + pos, dir, slist, scount, result, adx);
+
+
+		surf2Dwrite(result, out, x * sizeof(unsigned int), y, cudaBoundaryModeClamp);
 	}
 }
 
@@ -285,28 +292,18 @@ __global__ void render(int width, int height, float3 cameraPos, Sphere* slist, i
 float adx = 0.00;
 float ady = 0.00;
 
-void Renderer::renderFrame(int width, int height, int* pixels)
-{
-	int numElements = width*height;
-	int size = sizeof(pixels[0]) * numElements;
 
+void Renderer::renderFrame(int width, int height, cudaSurfaceObject_t pixels)
+{
 	 adx += 0.003f;
 	 ady += 0.003f;
 
 	float3 cameraPos = {0, 0, 0};
 
 
-	dim3 blockSize(16,16); //16 * 16 threads per block
+	render<<<gridSize, blockSize >>>(width, height, cameraPos, devslist, tcount, pixels,  adx,  ady);
 
-	int xGridSize = (width + blockSize.x-1)/blockSize.x; 
-	int yGridSize = (height + blockSize.y-1)/blockSize.y;
-
-	dim3 gridSize( xGridSize, yGridSize);
-
-
-	render<<< gridSize, blockSize >>>(width, height, cameraPos, devslist, tcount, devPixels,  adx,  ady);
-
-	cudaMemcpy(pixels, devPixels, size, cudaMemcpyDeviceToHost);
+	//cudaMemcpy(pixels, devPixels, size, cudaMemcpyDeviceToHost);
 }
 
 

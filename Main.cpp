@@ -1,116 +1,136 @@
-#include <windows.h>
-#include <windowsx.h>
 #include "Renderer.cuh"
 #include "Timer.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-#define WIDTH 1280
-#define HEIGHT 720
+#pragma comment(lib, "glew32.lib")
+#pragma comment(lib, "glu32.lib")
+#pragma comment(lib, "opengl32.lib")
+#pragma comment(lib, "glfw3.lib")
 
-HWND hwnd;
-HDC hdc;
-WNDCLASSEX wc;
+#include <GL\glew.h>
+#include <GLFW\glfw3.h>
+#include <gl\GL.h>
+#include <gl\GLU.h>
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
-int run(HINSTANCE &hinstance);
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
+#include "cuda.h"
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
 
-int WINAPI WinMain(HINSTANCE hinstance, HINSTANCE hiprev, LPSTR cmd, int cmdShow)
+
+#define WIDTH 800
+#define HEIGHT 600
+
+#define checkErrors(ans) if(ans != cudaSuccess){printf("CUDA error: %s %s %d\n", cudaGetErrorString(ans), __FILE__, __LINE__); cudaGetLastError();}
+
+
+Renderer render;
+GLFWwindow* window;
+
+
+GLuint vtex;
+cudaGraphicsResource_t cudavres;
+
+
+void display()
 {
-	ZeroMemory(&wc, sizeof(WNDCLASSEX));
-
-    wc.cbSize = sizeof(WNDCLASSEX);
-    wc.style = CS_HREDRAW | CS_VREDRAW;
-    wc.lpfnWndProc = WindowProc;
-    wc.hInstance = hinstance;
-    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-    wc.lpszClassName = "RayTracing";
-
-    RegisterClassEx(&wc);
-
-	RECT windowRect = {0, 0, WIDTH, HEIGHT};
 	
-    AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+	glClear(GL_COLOR_BUFFER_BIT);
 
-    hwnd = CreateWindowEx(NULL,
-                          wc.lpszClassName,
-                          "Ray Tracing",
-                          WS_OVERLAPPEDWINDOW,
-                          300,
-                          300,
-                          windowRect.right - windowRect.left,
-                          windowRect.bottom - windowRect.top,
-                          NULL,
-                          NULL,
-						  hinstance,
-                          NULL);
+checkErrors(	cudaGraphicsMapResources(1, &cudavres));
+	
+	cudaArray_t cudavarray;
+checkErrors(	cudaGraphicsSubResourceGetMappedArray(&cudavarray, cudavres, 0, 0));
 
-	hdc = GetDC(hwnd);
+	cudaResourceDesc cudavarrayresdesc;
+	memset(&cudavarrayresdesc, 0, sizeof(cudavarrayresdesc));
+	cudavarrayresdesc.resType = cudaResourceTypeArray;
+	cudavarrayresdesc.res.array.array = cudavarray;
+	
 
-    ShowWindow(hwnd, cmdShow);
+	cudaSurfaceObject_t cudavsurfaceobject;
+checkErrors(	cudaCreateSurfaceObject(&cudavsurfaceobject, &cudavarrayresdesc));
+	
 
-	int result = run(hinstance);
-
-	ReleaseDC(hwnd, hdc);
-
-	return result;
-}
+	render.renderFrame(WIDTH, HEIGHT, cudavsurfaceobject);
 
 
-int run(HINSTANCE &hinstance)
-{
-	Renderer render;
-	Timer timer;
-	MSG msg;
-	int* pixels;
 
-	render = Renderer();
-	timer = Timer();
-	render.setResolution(WIDTH, HEIGHT);
-	pixels = new int[WIDTH*HEIGHT];
+checkErrors(	cudaGetLastError());
+checkErrors(	cudaDeviceSynchronize());
 
-	while(true)
-    {
-        if(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
 
-            if(msg.message == WM_QUIT)
-                break;
-        }
+checkErrors(	cudaDestroySurfaceObject(cudavsurfaceobject));
+checkErrors(	cudaGraphicsUnmapResources(1, &cudavres));
+checkErrors(	cudaStreamSynchronize(0));
 
- 		timer.start();
 
-		render.renderFrame(WIDTH, HEIGHT, pixels);
 
-		HBITMAP frame = CreateBitmap(WIDTH, HEIGHT, 1, sizeof(int)*8, pixels);
 
-		if(frame != NULL)
+	glBindTexture(GL_TEXTURE_2D,vtex);
+	{
+		glBegin(GL_QUADS);
 		{
-			DrawState(hdc, NULL, NULL, (LPARAM)frame, NULL, 0, 0, 0, 0, DST_BITMAP);
+			glTexCoord2f(0.0f, 0.0f); glVertex2f(-1.0f, -1.0f);
+            glTexCoord2f(1.0f, 0.0f); glVertex2f(+1.0f, -1.0f);
+            glTexCoord2f(1.0f, 1.0f); glVertex2f(+1.0f, +1.0f);
+            glTexCoord2f(0.0f, 1.0f); glVertex2f(-1.0f, +1.0f);
 		}
-		DeleteObject(frame);
+		glEnd();
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
 
-		timer.stop();
+	glfwSwapBuffers(window);
+	glfwPollEvents();
 
-		float f = timer.getFPS();
-		float fc = timer.getFrameCount();
-    }
 
-	 return msg.wParam;
 }
 
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
+int main(int argc, char** argv) 
 {
-    switch(message)
-    {
-        case WM_DESTROY:
-            {
-                PostQuitMessage(0);
-                return 0;
-				break;
-            }
-    }
+	render = Renderer();
 
-    return DefWindowProc (hwnd, message, wParam, lParam);
+	
+
+	glfwInit();
+
+	window = glfwCreateWindow(WIDTH, HEIGHT, "Ray Tracing", NULL, NULL);
+	glfwMakeContextCurrent(window);
+	//glfwSetKeyCallback(window, key_callback);
+
+
+
+	//glewExperimental = GL_TRUE;
+	glewInit();
+
+
+
+	glEnable(GL_TEXTURE_2D);
+	glGenTextures(1, &vtex);
+
+	glBindTexture(GL_TEXTURE_2D, vtex);
+	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, WIDTH, HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+
+	checkErrors(cudaGLSetGLDevice(0));
+	checkErrors(cudaGraphicsGLRegisterImage(&cudavres, vtex, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard));
+
+
+	render.setResolution(WIDTH, HEIGHT);
+	while(true)
+	{
+		display();
+	}
+
+	glfwDestroyWindow(window);
+	glfwTerminate();
+	return 0;
 }
