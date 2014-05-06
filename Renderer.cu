@@ -115,7 +115,7 @@ struct CameraInfo
 */
 Sphere* slist;
 Sphere* devslist;
-int tcount = 13;
+int tcount = 6;
 
 Renderer::Renderer(void)
 {
@@ -137,32 +137,13 @@ Renderer::Renderer(void)
 	slist[3].position = make_float3(0, -40, 0);
 	slist[3].radius = 5;
 
-	slist[4].position = make_float3(10, 10, -30);
-	slist[4].radius = 10;
+	slist[4].position = make_float3(-0, -10000, 0);
+	slist[4].radius = 9960;
 
-	slist[5].position = make_float3(-0, 0, -27);
-	slist[5].radius = 5;
+	slist[5].position = make_float3(20, -30, 0);
+	slist[5].radius = 8;
 
-	slist[6].position = make_float3(-0, 0, 10000);
-	slist[6].radius = 9989;
 
-	slist[7].position = make_float3(20, -30, 0);
-	slist[7].radius = 8;
-
-	slist[8].position = make_float3(0, -47, 0);
-	slist[8].radius = 5;
-
-	slist[9].position = make_float3(-10, 10, -30);
-	slist[9].radius = 4;
-
-	slist[10].position = make_float3(-10, -30, 0);
-	slist[10].radius = 3;
-
-	slist[11].position = make_float3(20, -40, 0);
-	slist[11].radius = 5;
-
-	slist[12].position = make_float3(15, 10, -30);
-	slist[12].radius = 1;
 
 	cudaMalloc((void**)&devslist, tcount * sizeof(Sphere));
 	cudaMemcpy(devslist, slist, tcount * sizeof(Sphere), cudaMemcpyHostToDevice);
@@ -180,8 +161,8 @@ void Renderer::setResolution(int width, int height)
 
 	gridSize = dim3( xGridSize, yGridSize);
 
-	rwidth = width;
-	rheight = height;
+	renderWidth = width;
+	renderHeight = height;
 }
 
 void Renderer::setProjectionMode(bool orthographic)
@@ -192,7 +173,7 @@ void Renderer::setProjectionMode(bool orthographic)
 
 __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scount, unsigned int& out, float adx)
 {
-	float3 lightPos = {0 +50*__cosf(adx), 50*__sinf(adx), -60};
+	float3 lightPos = {0 +8000*__cosf(adx), 5000, 8000*__sinf(adx)};
 
 	float d = -1;
 	int snum = -1;
@@ -259,6 +240,9 @@ __global__ void render(int width, int height, float3 cameraPos, Sphere* slist, i
 		float norx;
 		float nory;
 
+
+		float div;
+
 		if(width < height)
 		{
 			norx = (x - 0.5*width)/(0.5*width);
@@ -274,11 +258,24 @@ __global__ void render(int width, int height, float3 cameraPos, Sphere* slist, i
 
 		unsigned int result = 0;
 
-		float3 dir = {norx, nory, 1};	//Screen location
+		float pi = 3.14159f;
+
+		
+
+		
+
+		//float dis = abs( sin(pi*(norx+1)/2) * sin(pi*(nory+1)/2));
+
+
+float dis = sqrt(200*adx - norx * norx - nory*nory);
+
+		float3 dir = {norx, nory, 0.01f + 1.99*dis };	//Screen location
 
 		dir = getRayDirection(cameraPos, dir);
 
-		float3 pos = {-0, -10, -70};
+		float3 pos = {-0, 20, -1770};
+
+//		float3 pos = {-0, 20, -100};
 
 		castRay(cameraPos + pos, dir, slist, scount, result, adx);
 
@@ -287,13 +284,61 @@ __global__ void render(int width, int height, float3 cameraPos, Sphere* slist, i
 	}
 }
 
+__global__ void createLens(float3 *rayDirection, int width, int height, bool sphere, float radius)
+{
+	int x = blockDim.x * blockIdx.x + threadIdx.x;
+	int y = blockDim.y * blockIdx.y + threadIdx.y;
 
+	if(x < width && y < height)
+	{
+		float normalizedX;
+		float normalizedY;
+
+		if(width < height)
+		{
+			normalizedX = (x - 0.5*width)/(0.5*width);
+			normalizedY = (y - 0.5*height)/(0.5*width);
+		}
+		else
+		{
+			normalizedX = (x - 0.5*width)/(0.5*height);
+			normalizedY = (y - 0.5*height)/(0.5*height);
+		}
+
+		float3 lensLocation;
+		float3 origin = {0, 0, 0};
+
+		if(sphere)
+		{
+			float sphereZCoord = sqrt(radius*radius - normalizedX*normalizedX - normalizedY*normalizedY);
+			lensLocation = make_float3(normalizedX, normalizedY, sphereZCoord);
+			
+			rayDirection[y * width + x] = getRayDirection(origin, lensLocation);
+		}
+		else
+		{
+			lensLocation = make_float3(normalizedX, normalizedY, 1);
+
+			rayDirection[y * width + x] = getRayDirection(origin, lensLocation);
+		}
+	}
+}
 
 float adx = 0.00;
 float ady = 0.00;
 
 
-void Renderer::renderFrame(int width, int height, cudaSurfaceObject_t pixels)
+void Renderer::createLens(int width, int height)
+{
+
+}
+
+void Renderer::createSphericalLens(int width, int height, int radius)
+{
+
+}
+
+void Renderer::renderFrame(cudaSurfaceObject_t pixels)
 {
 	 adx += 0.003f;
 	 ady += 0.003f;
@@ -301,10 +346,11 @@ void Renderer::renderFrame(int width, int height, cudaSurfaceObject_t pixels)
 	float3 cameraPos = {0, 0, 0};
 
 
-	render<<<gridSize, blockSize >>>(width, height, cameraPos, devslist, tcount, pixels,  adx,  ady);
+	render<<<gridSize, blockSize >>>(renderWidth, renderHeight, cameraPos, devslist, tcount, pixels,  adx,  ady);
 
 	//cudaMemcpy(pixels, devPixels, size, cudaMemcpyDeviceToHost);
 }
+
 
 
 Renderer::~Renderer(void)
