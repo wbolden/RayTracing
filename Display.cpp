@@ -6,7 +6,7 @@ Display::Display(GLFWwindow* window)
 	glfwGetWindowSize(window, &width, &height);
 }
 
-void Display::initWindow()
+void Display::initRenderTexture()
 {
 	glewInit();
 

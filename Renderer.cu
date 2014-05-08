@@ -119,7 +119,7 @@ int tcount = 6;
 
 Renderer::Renderer(void)
 {
-	devPixels = nullptr;
+	viewLens = nullptr;
 
 	
 
@@ -203,7 +203,7 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 		{												
 			if(slist[i].sshadowed(contactPoint, cray, dot(contactPoint - lightPos))	) //add ray length parameter, for shadows ray length is distance to light
 			{
-				out = rgb(0xFF, 0xFF, 0xFF, intensity);	//Color in light
+				out = rgb(0xFF, 0xFF, 0x9F, intensity);	//Color in light
 			}
 			else
 			{
@@ -220,71 +220,27 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 }
 
 
-__global__ void render(int width, int height, float3 cameraPos, Sphere* slist, int scount, cudaSurfaceObject_t out, float adx, float ady)
+__global__ void cuRender(float3* rayDirections, int width, int height, float3 cameraPos, Sphere* slist, int scount, cudaSurfaceObject_t out, float adx, float ady)
 {
 	int x = blockDim.x * blockIdx.x + threadIdx.x;
 	int y = blockDim.y * blockIdx.y + threadIdx.y;
 
 	if(x < width && y < height)
 	{
-	//	int i= y * width + x;
-
-		/*
-			Normalize the values.
-			The smaller of the two (width or height) is normalized to a range [-1, 1]
-			The larger of the two is normalized depending on the value of the smaller
-
-			Both are normalized to the range [-1, 1] if they are the same
-		*/
-
-		float norx;
-		float nory;
-
-
-		float div;
-
-		if(width < height)
-		{
-			norx = (x - 0.5*width)/(0.5*width);
-			nory = (y - 0.5*height)/(0.5*width);
-		}
-		else
-		{
-			norx = (x - 0.5*width)/(0.5*height);
-			nory = (y - 0.5*height)/(0.5*height);
-		}
-
-		
-
+	
 		unsigned int result = 0;
+//		float3 pos = {-0, 20, -1770};
 
-		float pi = 3.14159f;
+		float3 pos = {-0, 20, -100};
 
-		
-
-		
-
-		//float dis = abs( sin(pi*(norx+1)/2) * sin(pi*(nory+1)/2));
-
-
-float dis = sqrt(200*adx - norx * norx - nory*nory);
-
-		float3 dir = {norx, nory, 0.01f + 1.99*dis };	//Screen location
-
-		dir = getRayDirection(cameraPos, dir);
-
-		float3 pos = {-0, 20, -1770};
-
-//		float3 pos = {-0, 20, -100};
-
-		castRay(cameraPos + pos, dir, slist, scount, result, adx);
+		castRay(cameraPos + pos, rayDirections[y * width + x], slist, scount, result, adx);
 
 
 		surf2Dwrite(result, out, x * sizeof(unsigned int), y, cudaBoundaryModeClamp);
 	}
 }
 
-__global__ void createLens(float3 *rayDirection, int width, int height, bool sphere, float radius)
+__global__ void cuCreateLens(float3 *rayDirections, int width, int height, bool sphere, float radius)
 {
 	int x = blockDim.x * blockIdx.x + threadIdx.x;
 	int y = blockDim.y * blockIdx.y + threadIdx.y;
@@ -313,30 +269,50 @@ __global__ void createLens(float3 *rayDirection, int width, int height, bool sph
 			float sphereZCoord = sqrt(radius*radius - normalizedX*normalizedX - normalizedY*normalizedY);
 			lensLocation = make_float3(normalizedX, normalizedY, sphereZCoord);
 			
-			rayDirection[y * width + x] = getRayDirection(origin, lensLocation);
+			rayDirections[y * width + x] = getRayDirection(origin, lensLocation);
 		}
 		else
 		{
 			lensLocation = make_float3(normalizedX, normalizedY, 1);
 
-			rayDirection[y * width + x] = getRayDirection(origin, lensLocation);
+			rayDirections[y * width + x] = getRayDirection(origin, lensLocation);
 		}
 	}
 }
 
-float adx = 0.00;
-float ady = 0.00;
-
-
 void Renderer::createLens(int width, int height)
 {
-
+	if(viewLens == nullptr)
+	{
+		cudaMalloc((void**)&viewLens, renderWidth * renderHeight * sizeof(float3));
+	}
+	
+	cuCreateLens<<<gridSize, blockSize>>>(viewLens, renderWidth, renderHeight, false, 0);
 }
 
 void Renderer::createSphericalLens(int width, int height, int radius)
 {
+	if(viewLens == nullptr)
+	{
+		cudaMalloc((void**)&viewLens, renderWidth * renderHeight * sizeof(float3));
+	}
 
+	cuCreateLens<<<gridSize, blockSize>>>(viewLens, renderWidth, renderHeight, true, 4);
 }
+
+
+
+
+
+
+
+
+
+
+
+float adx = 0.00;
+float ady = 0.00;
+
 
 void Renderer::renderFrame(cudaSurfaceObject_t pixels)
 {
@@ -346,14 +322,12 @@ void Renderer::renderFrame(cudaSurfaceObject_t pixels)
 	float3 cameraPos = {0, 0, 0};
 
 
-	render<<<gridSize, blockSize >>>(renderWidth, renderHeight, cameraPos, devslist, tcount, pixels,  adx,  ady);
-
-	//cudaMemcpy(pixels, devPixels, size, cudaMemcpyDeviceToHost);
+	cuRender<<<gridSize, blockSize >>>(viewLens ,renderWidth, renderHeight, cameraPos, devslist, tcount, pixels,  adx,  ady);
 }
 
 
 
 Renderer::~Renderer(void)
 {
-	cudaFree(devPixels);
+	
 }

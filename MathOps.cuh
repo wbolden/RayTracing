@@ -84,7 +84,7 @@ inline __device__ int rgb(int r, int g, int b, float intensity)
 {
 	if(intensity >= 0)
 	{
-	return (((int)(r*intensity))<< 16) | (((int)(g*intensity))<< 8) | ((int)(b*intensity))  ;
+		return (((int)(r*intensity))<< 16) | (((int)(g*intensity))<< 8) | ((int)(b*intensity));
 	}else{
 		return 0;
 	}

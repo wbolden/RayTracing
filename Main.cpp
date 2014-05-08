@@ -10,7 +10,7 @@
 #pragma comment(lib, "opengl32.lib")
 #pragma comment(lib, "glfw3.lib")
 
-#define WIDTH 600
+#define WIDTH 800
 #define HEIGHT 600
 
 int main(int argc, char** argv) 
@@ -23,14 +23,24 @@ int main(int argc, char** argv)
 
 	Display display = Display(window);
 
-	display.initWindow();
+	display.initRenderTexture();
 	display.createRenderer();
 	
+	Timer timer = Timer();
+
 	while(true)
 	{
 		//todo: get inputs
-		
+
+		timer.start();
+
 		display.displayFrame(window);
+
+		timer.stop();
+		if(timer.getFrameCount() % 10 == 0)
+		{
+			printf("%f\n", timer.getFPS());
+		}
 	}
 
 	glfwDestroyWindow(window);

@@ -9,6 +9,7 @@ class Renderer
 {
 public:
 	Renderer(void);
+
 	void setResolution(int width, int height);
 	void createLens(int width, int height);
 	void createSphericalLens(int width, int height, int radius);
@@ -18,9 +19,10 @@ public:
 	~Renderer(void);
 
 private:
-	int* devPixels;
 	bool orthographic;
 	int renderWidth, renderHeight;
+
+	float3* viewLens;
 };
 
 #endif

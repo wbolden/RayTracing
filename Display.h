@@ -13,8 +13,8 @@ class Display
 public:
 	Display(GLFWwindow* window);
 	
-	void initWindow();
-	void resizeWindow(GLFWwindow* window, int width, int height);
+	void initRenderTexture();
+	void resizeWindow(GLFWwindow* window);
 	void createRenderer();
 	void displayFrame(GLFWwindow* window);
 	
