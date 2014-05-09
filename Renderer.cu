@@ -4,7 +4,7 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
-
+#include <stdio.h>
 
 __device__ float intersection(float3 rayOrigin, float3 rayDirection, float distance,float3 position, float radius)
 {
@@ -90,16 +90,6 @@ struct Sphere
 	float3 position;
 	float radius;
 	float reflectivity;
-
-	__device__ float sintersection(float3 rayOrigin, float3 rayDirection, float distance)
-	{
-		return intersection(rayOrigin, rayDirection, distance, position, radius);
-	}
-
-	__device__ bool sshadowed(float3 rayOrigin, float3 rayDirection, float distance)
-	{
-		return shadowed(rayOrigin, rayDirection, distance, position, radius);
-	}
 };
 
 struct CameraInfo
@@ -154,7 +144,7 @@ dim3 gridSize;
 
 void Renderer::setResolution(int width, int height)
 {
-	blockSize = dim3(16,16); //16 * 16 threads per block
+	blockSize = dim3(32,32); //16 * 16 threads per block
 
 	int xGridSize = (width + blockSize.x-1)/blockSize.x; 
 	int yGridSize = (height + blockSize.y-1)/blockSize.y;
@@ -175,12 +165,26 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 {
 	float3 lightPos = {0 +8000*__cosf(adx), 5000, 8000*__sinf(adx)};
 
+
+	if(slist[0].radius > 31.0f || slist[0].radius < 29.0f)
+	{
+		if(threadIdx.x == 0)
+		{
+	//	printf("%d : %d\n",blockIdx.x, blockIdx.y);
+		
+		}
+		int derdd =0;
+		derdd++;
+		out = 0xFF*blockIdx.x * blockIdx.y + 0xFF;
+		return;
+	}
+
 	float d = -1;
 	int snum = -1;
 
 	for(int i = 0; i < scount; i++)
 	{
-		float td = slist[i].sintersection(start, direction, 100000);
+		float td = intersection(start, direction, 100000, slist[i].position, slist[i].radius);
 		if((d < 0 || td < d) && td > 0)
 		{
 			d = td;
@@ -201,7 +205,7 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 
 		for(int i = 0; i < scount; i++)
 		{												
-			if(slist[i].sshadowed(contactPoint, cray, dot(contactPoint - lightPos))	) //add ray length parameter, for shadows ray length is distance to light
+			if(shadowed(contactPoint, cray, dot(contactPoint - lightPos), slist[i].position, slist[i].radius	)) //add ray length parameter, for shadows ray length is distance to light
 			{
 				out = rgb(0xFF, 0xFF, 0x9F, intensity);	//Color in light
 			}
@@ -222,18 +226,41 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 
 __global__ void cuRender(float3* rayDirections, int width, int height, float3 cameraPos, Sphere* slist, int scount, cudaSurfaceObject_t out, float adx, float ady)
 {
+	extern __shared__ Sphere sharedslist[];
+
 	int x = blockDim.x * blockIdx.x + threadIdx.x;
 	int y = blockDim.y * blockIdx.y + threadIdx.y;
 
 	if(x < width && y < height)
 	{
 	
+		unsigned int index = y * width + x;
+		unsigned int tindex = threadIdx.y;
+
+		if(index < scount)
+		{
+		//	sharedslist[tindex] = slist[tindex];
+
+		//	sharedslist[tindex] = Sphere();
+		//	sharedslist[tindex].position = slist[tindex].position;
+		//	sharedslist[tindex].radius	 = slist[tindex].radius;
+		//	sharedslist[tindex].reflectivity = slist[tindex].reflectivity;
+		}
+
+		/*
+			Get to work properly ( ^^^^ ), the below implementation is still better than global
+		*/
+
+		for(int i = 0; i < scount; i++)
+		sharedslist[i] = slist[i];
+		__syncthreads();
+
 		unsigned int result = 0;
 //		float3 pos = {-0, 20, -1770};
 
 		float3 pos = {-0, 20, -100};
 
-		castRay(cameraPos + pos, rayDirections[y * width + x], slist, scount, result, adx);
+		castRay(cameraPos + pos, rayDirections[index], sharedslist, scount, result, adx);
 
 
 		surf2Dwrite(result, out, x * sizeof(unsigned int), y, cudaBoundaryModeClamp);
@@ -322,7 +349,9 @@ void Renderer::renderFrame(cudaSurfaceObject_t pixels)
 	float3 cameraPos = {0, 0, 0};
 
 
-	cuRender<<<gridSize, blockSize >>>(viewLens ,renderWidth, renderHeight, cameraPos, devslist, tcount, pixels,  adx,  ady);
+	unsigned int smem = sizeof(Sphere)*tcount;
+
+	cuRender<<<gridSize, blockSize, smem >>>(viewLens ,renderWidth, renderHeight, cameraPos, devslist, tcount, pixels,  adx,  ady);
 }
 
 

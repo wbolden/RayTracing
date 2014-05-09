@@ -58,13 +58,13 @@ inline __device__ float dot(const float3 &a)
 //Returns the inverse magnitude of a vector
 inline __device__ float iMagnitude(const float3 &a)
 {
-	return rsqrt(dot(a));
+	return rsqrtf(dot(a));
 }
 
 //Retruns the magnitude of a vector
 inline __device__ float magnitude(const float3 &a)
 {
-	return sqrt(dot(a));
+	return sqrtf(dot(a));
 }
 
 //Returns a normalized vector

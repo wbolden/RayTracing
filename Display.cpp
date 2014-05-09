@@ -31,6 +31,8 @@ void Display::createRenderer()
 	render.createLens(width, height);
 }
 
+
+
 void Display::displayFrame(GLFWwindow* window)
 {
 	
