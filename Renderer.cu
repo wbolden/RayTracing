@@ -166,19 +166,6 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 	float3 lightPos = {0 +8000*__cosf(adx), 5000, 8000*__sinf(adx)};
 
 
-	if(slist[0].radius > 31.0f || slist[0].radius < 29.0f)
-	{
-		if(threadIdx.x == 0)
-		{
-	//	printf("%d : %d\n",blockIdx.x, blockIdx.y);
-		
-		}
-		int derdd =0;
-		derdd++;
-		out = 0xFF*blockIdx.x * blockIdx.y + 0xFF;
-		return;
-	}
-
 	float d = -1;
 	int snum = -1;
 
@@ -235,24 +222,12 @@ __global__ void cuRender(float3* rayDirections, int width, int height, float3 ca
 	{
 	
 		unsigned int index = y * width + x;
-		unsigned int tindex = threadIdx.y;
+		unsigned int tindex = threadIdx.x;
 
-		if(index < scount)
+		if(tindex < scount)
 		{
-		//	sharedslist[tindex] = slist[tindex];
-
-		//	sharedslist[tindex] = Sphere();
-		//	sharedslist[tindex].position = slist[tindex].position;
-		//	sharedslist[tindex].radius	 = slist[tindex].radius;
-		//	sharedslist[tindex].reflectivity = slist[tindex].reflectivity;
+			sharedslist[tindex] = slist[tindex];
 		}
-
-		/*
-			Get to work properly ( ^^^^ ), the below implementation is still better than global
-		*/
-
-		for(int i = 0; i < scount; i++)
-		sharedslist[i] = slist[i];
 		__syncthreads();
 
 		unsigned int result = 0;
