@@ -11,21 +11,30 @@
 
 
 
-__device__ void shadow()
+__device__ void cuLight()
+{
+
+}	
+
+__device__ void cuRefraction()
 {
 
 }
 
-__device__ void refraction()
+__device__ void cuReflection()
 {
 
 }
 
-__device__ void reflection()
+__device__ void cuIntersection()
 {
 
 }
 
+__device__ void cuCastRay()
+{
+
+}
 
 __device__ float intersection(float3 rayOrigin, float3 rayDirection, float distance,float3 position, float radius)
 {
@@ -155,7 +164,7 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 	}
 }
 
-__global__ void cuRender(float3* rayDirections, int width, int height, float3 cameraPos, Sphere* slist, int scount, cudaSurfaceObject_t out, float adx, float ady)
+__global__ void cuRender(float3* rayDirections, int width, int height, float3 cameraPos, Sphere* slist, int scount, cudaSurfaceObject_t out, float adx, float ady, int aa)
 {
 	extern __shared__ Sphere sharedslist[];
 
@@ -186,6 +195,7 @@ __global__ void cuRender(float3* rayDirections, int width, int height, float3 ca
 		float normalizedX;
 		float normalizedY;
 
+		/*
 		if(width < height)
 		{
 			normalizedX = (x - 0.5*width)/(0.5*width);
@@ -196,26 +206,25 @@ __global__ void cuRender(float3* rayDirections, int width, int height, float3 ca
 			normalizedX = (x - 0.5*width)/(0.5*height);
 			normalizedY = (y - 0.5*height)/(0.5*height);
 		}
+		*/
 
 		float3 lensLocation;
+		float3 dir;
 		float3 origin = {0, 0, 0};
 
-		lensLocation = make_float3(normalizedX, normalizedY, 1);
+	//	lensLocation = make_float3(normalizedX, normalizedY, 1);
 
-		float3 dir = getRayDirection(origin, lensLocation);
+	//	dir = getRayDirection(origin, lensLocation);
 
+		 
+		int offs = aa/2;
 
-	//	int aamt = 5;
-#define aamt 7
-#define offs aamt/2
+		int rr = 0;
+		float3 pos = {-0, 20, -100};
 
-
-		float norx[aamt][aamt];
-		float nory[aamt][aamt];
-
-		for(int ix = 0; ix < aamt; ix++)
+		for(int ix = 0; ix < aa; ix++)
 		{
-			for(int iy = 0; iy < aamt; iy++)
+			for(int iy = 0; iy < aa; iy++)
 			{
 				float aix = ix - offs;;
 				float aiy = iy - offs;
@@ -223,62 +232,21 @@ __global__ void cuRender(float3* rayDirections, int width, int height, float3 ca
 				normalizedX = (x+aix/(1.5*offs) - 0.5*width)/(0.5*height);
 				normalizedY = (y+aiy/(1.5*offs)  - 0.5*height)/(0.5*height);
 
-				norx[ix][iy] = normalizedX;
-				nory[ix][iy] = normalizedY;
-
-			}
-
-		}
-
-		
-
-		
-		unsigned int ots[aamt][aamt];
-		int dirs[aamt][aamt];
-
-		float3 pos = {-0, 20, -100};
-
-		for(int ix = 0; ix < aamt; ix++)
-		{
-			for(int iy = 0; iy < aamt; iy++)
-			{
-
-				lensLocation = make_float3(norx[ix][iy], nory[ix][iy], 1);
+				lensLocation = make_float3(normalizedX, normalizedY, 1);
 
 				dir = getRayDirection(origin, lensLocation);
 
-				castRay(cameraPos + pos, dir, sharedslist, scount, ots[ix][iy], adx);
+				castRay(cameraPos + pos, dir, sharedslist, scount, result, adx);
 
-			}
-
-		}
-		
-		int rr = 0;
-	//	int rg = 0;
-	//	int rb = 0;
-
-		for(int ix = 0; ix < aamt; ix++)
-		{
-			for(int iy = 0; iy < aamt; iy++)
-			{
-
-
-
-				rr += (ots[ix][iy]<<24) >> 24;
+				rr += (result<<24) >> 24;
 
 			}
 
 		}
 
-		rr /= aamt*aamt;
+		rr /= aa*aa;
 
 		result = rgb(rr, rr, rr, 1);
-
-
-
-	//	float3 pos = {-0, 20, -100};
-
-	//	castRay(cameraPos + pos, dir, sharedslist, scount, result, adx);
 
 
 		surf2Dwrite(result, out, x * sizeof(unsigned int), y, cudaBoundaryModeClamp);
@@ -435,7 +403,7 @@ void Renderer::renderFrame(cudaSurfaceObject_t pixels)
 
 	unsigned int smem = sizeof(Sphere)*tcount;
 
-	cuRender<<<gridSize, blockSize, smem >>>(viewLens ,renderWidth, renderHeight, cameraPos, devslist, tcount, pixels,  adx,  ady);
+	cuRender<<<gridSize, blockSize, smem >>>(viewLens ,renderWidth, renderHeight, cameraPos, devslist, tcount, pixels,  adx,  ady, 7);
 }
 
 
