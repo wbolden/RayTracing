@@ -25,4 +25,18 @@ private:
 	float3* viewLens;
 };
 
+struct Sphere
+{
+	float3 position;
+	float radius;
+	float reflectivity;
+};
+
+struct CameraInfo
+{
+	float3 position;
+	float3 viewpos;
+	float3 rotation;
+};
+
 #endif

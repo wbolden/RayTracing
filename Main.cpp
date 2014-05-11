@@ -33,7 +33,7 @@ int main(int argc, char** argv)
 		//todo: get inputs
 
 		timer.start();
-
+		
 		display.displayFrame(window);
 
 		timer.stop();
