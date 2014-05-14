@@ -31,7 +31,7 @@ __device__ void cuIntersection()
 
 }
 
-__device__ void cuCastRay()
+__device__ unsigned int cuCastRay()
 {
 
 }
@@ -167,6 +167,65 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 }
 //To be moved into cu... methods ^^^
 
+__device__ unsigned int cuRenderPixelAA(int pixelX, int pixelY, int width, int height, int aa,float3 position, Sphere* sharedslist, int scount, float adx) //adx to be removed
+{
+	unsigned int result;
+
+	int rr = 0;
+
+	float offs = 0;
+
+	if(aa % 2 == 0)
+	{
+		 offs = aa;//finish
+	}
+	else
+	{
+		 offs = (int)aa/2;
+	}
+	 
+
+	for(int ix = 0; ix < aa; ix++)
+	{
+		for(int iy = 0; iy < aa; iy++)
+		{
+			float aix = ix - offs;
+			float aiy = iy - offs;
+
+			float normalizedX = (pixelX+aix/(1.5*offs) - 0.5*width)/(0.5*height);
+			float normalizedY = (pixelY+aiy/(1.5*offs)  - 0.5*height)/(0.5*height);
+
+			float3 lensLocation = {normalizedX, normalizedY, 1};
+
+			float3 dir = getRayDirection(make_float3(0, 0, 0), lensLocation);
+
+			castRay(position, dir, sharedslist, scount, result, adx);
+
+			rr += (result<<24) >> 24;
+
+		}
+	}
+	rr /= aa*aa;
+	result = rgb(rr, rr, rr, 1);
+	return result;
+}
+
+__device__ unsigned int cuRenderPixel(int pixelX, int pixelY, int width, int height, float3 position, Sphere* sharedslist, int scount, float adx) //adx to be removed
+{
+	unsigned int result;
+	
+	float normalizedX = (pixelX - 0.5*width)/(0.5*height);
+	float normalizedY = (pixelY - 0.5*height)/(0.5*height);
+
+	float3 lensLocation = {normalizedX, normalizedY, 1};
+
+	float3 dir = getRayDirection(make_float3(0, 0, 0), lensLocation);
+
+	castRay(position, dir, sharedslist, scount, result, adx);
+
+	return result;
+}
+
 __global__ void cuRender(cudaSurfaceObject_t out, int width, int height, int aa, float3 cameraPos, Sphere* slist, int scount, float adx, float ady)
 {
 	extern __shared__ Sphere sharedslist[];
@@ -199,50 +258,17 @@ __global__ void cuRender(cudaSurfaceObject_t out, int width, int height, int aa,
 		unsigned int result = 0;
 
 
+		float3 pos = {-0, 20, -100- adx*20};
 		
 
-
-		float normalizedX;
-		float normalizedY;
-
-
-
-		float3 lensLocation;
-		float3 dir;
-		float3 origin = {0, 0, 0};
-
-		 
-		int offs = aa/2;
-
-		int rr = 0;
-		float3 pos = {-0, 20, -100- adx*20};
-
-		for(int ix = 0; ix < aa; ix++)
+		if(aa > 1)
 		{
-			for(int iy = 0; iy < aa; iy++)
-			{
-				float aix = ix - offs;;
-				float aiy = iy - offs;
-
-				normalizedX = (x+aix/(1.5*offs) - 0.5*width)/(0.5*height);
-				normalizedY = (y+aiy/(1.5*offs)  - 0.5*height)/(0.5*height);
-
-				lensLocation = make_float3(normalizedX, normalizedY, 1);
-
-				dir = getRayDirection(origin, lensLocation);
-
-				castRay(cameraPos + pos, dir, sharedslist, scount, result, adx);
-
-				rr += (result<<24) >> 24;
-
-			}
-
+			result = cuRenderPixelAA(x, y, width, height, aa, pos, sharedslist, scount, adx);
 		}
-
-		rr /= aa*aa;
-
-		result = rgb(rr, rr, rr, 1);
-
+		else
+		{
+			result = cuRenderPixel(x, y, width, height, pos, sharedslist, scount, adx);
+		}
 
 		surf2Dwrite(result, out, x * sizeof(unsigned int), y, cudaBoundaryModeClamp);
 	}
@@ -319,7 +345,7 @@ void Renderer::renderFrame(cudaSurfaceObject_t pixels)
 	float3 cameraPos = {0, 0, 0};		//put in scene
 
 	unsigned int smem = sizeof(Sphere)*tcount;		//to be replaced
-	cuRender<<<gridSize, blockSize, smem >>>(pixels, renderWidth, renderHeight, 3, cameraPos, devslist, tcount, adx,  ady);
+	cuRender<<<gridSize, blockSize, smem >>>(pixels, renderWidth, renderHeight, 2, cameraPos, devslist, tcount, adx,  ady);
 }
 
 Renderer::~Renderer(void)
