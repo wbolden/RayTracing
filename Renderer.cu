@@ -36,6 +36,8 @@ __device__ void cuCastRay()
 
 }
 
+
+//To be moved into cu... methods ___
 __device__ float intersection(float3 rayOrigin, float3 rayDirection, float distance,float3 position, float radius)
 {
 	float3 dist = position - rayOrigin;
@@ -117,7 +119,7 @@ __device__ bool shadowed(float3 rayOrigin, float3 rayDirection, float distance,f
 
 __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scount, unsigned int& out, float adx)
 {
-	float3 lightPos = {0 +200*__cosf(adx), 300+ 200*__cosf(adx), 200*__sinf(adx)};
+	float3 lightPos = {0 +200*__cosf(adx), 300+ 200*__cosf(adx), 300*__cosf(adx)};
 
 
 	float d = -1;
@@ -163,13 +165,21 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 		out = 0x222222;		//Background color
 	}
 }
+//To be moved into cu... methods ^^^
 
-__global__ void cuRender(float3* rayDirections, int width, int height, float3 cameraPos, Sphere* slist, int scount, cudaSurfaceObject_t out, float adx, float ady, int aa)
+__global__ void cuRender(cudaSurfaceObject_t out, int width, int height, int aa, float3 cameraPos, Sphere* slist, int scount, float adx, float ady)
 {
 	extern __shared__ Sphere sharedslist[];
 
 	int x = blockDim.x * blockIdx.x + threadIdx.x;
 	int y = blockDim.y * blockIdx.y + threadIdx.y;
+
+	if(blockIdx.x *blockIdx.y ==1)
+	{
+		slist[0].position.x+=0.09;
+	}
+
+	__syncthreads();
 
 	if(x < width && y < height)
 	{
@@ -195,32 +205,17 @@ __global__ void cuRender(float3* rayDirections, int width, int height, float3 ca
 		float normalizedX;
 		float normalizedY;
 
-		/*
-		if(width < height)
-		{
-			normalizedX = (x - 0.5*width)/(0.5*width);
-			normalizedY = (y - 0.5*height)/(0.5*width);
-		}
-		else
-		{
-			normalizedX = (x - 0.5*width)/(0.5*height);
-			normalizedY = (y - 0.5*height)/(0.5*height);
-		}
-		*/
+
 
 		float3 lensLocation;
 		float3 dir;
 		float3 origin = {0, 0, 0};
 
-	//	lensLocation = make_float3(normalizedX, normalizedY, 1);
-
-	//	dir = getRayDirection(origin, lensLocation);
-
 		 
 		int offs = aa/2;
 
 		int rr = 0;
-		float3 pos = {-0, 20, -100};
+		float3 pos = {-0, 20, -100- adx*20};
 
 		for(int ix = 0; ix < aa; ix++)
 		{
@@ -253,61 +248,22 @@ __global__ void cuRender(float3* rayDirections, int width, int height, float3 ca
 	}
 }
 
-__global__ void cuCreateLens(float3 *rayDirections, int width, int height, bool sphere, float radius)
-{
-	int x = blockDim.x * blockIdx.x + threadIdx.x;
-	int y = blockDim.y * blockIdx.y + threadIdx.y;
-
-	if(x < width && y < height)
-	{
-		float normalizedX;
-		float normalizedY;
-
-		if(width < height)
-		{
-			normalizedX = (x - 0.5*width)/(0.5*width);
-			normalizedY = (y - 0.5*height)/(0.5*width);
-		}
-		else
-		{
-			normalizedX = (x - 0.5*width)/(0.5*height);
-			normalizedY = (y - 0.5*height)/(0.5*height);
-		}
-
-		float3 lensLocation;
-		float3 origin = {0, 0, 0};
-
-		if(sphere)
-		{
-			float sphereZCoord = sqrt(radius*radius - normalizedX*normalizedX - normalizedY*normalizedY);
-			lensLocation = make_float3(normalizedX, normalizedY, sphereZCoord);
-			
-			rayDirections[y * width + x] = getRayDirection(origin, lensLocation);
-		}
-		else
-		{
-			lensLocation = make_float3(normalizedX, normalizedY, 1);
-
-			rayDirections[y * width + x] = getRayDirection(origin, lensLocation);
-		}
-	}
-}
-
-#include <stdlib.h>
 
 
-/*
-	Just testing
-*/
+
+
+
+
+//To be cleaned up 
+
+float adx = 0.00;		//remove
+float ady = 0.00;		//remove
 Sphere* slist;
 Sphere* devslist;
 int tcount = 6;
 
 Renderer::Renderer(void)
 {
-	viewLens = nullptr;
-
-	
 
 	slist = new Sphere[tcount];
 
@@ -338,9 +294,6 @@ Renderer::Renderer(void)
 	cudaMemcpy(devslist, slist, tcount * sizeof(Sphere), cudaMemcpyHostToDevice);
 }
 
-dim3 blockSize;
-dim3 gridSize;
-
 void Renderer::setResolution(int width, int height)
 {
 	blockSize = dim3(16,16); //16 * 16 threads per block
@@ -359,56 +312,18 @@ void Renderer::setProjectionMode(bool orthographic)
 	this->orthographic = orthographic;
 }
 
-void Renderer::createLens(int width, int height)
-{
-	if(viewLens == nullptr)
-	{
-		cudaMalloc((void**)&viewLens, renderWidth * renderHeight * sizeof(float3));
-	}
-	
-	cuCreateLens<<<gridSize, blockSize>>>(viewLens, renderWidth, renderHeight, false, 0);
-}
-
-void Renderer::createSphericalLens(int width, int height, int radius)
-{
-	if(viewLens == nullptr)
-	{
-		cudaMalloc((void**)&viewLens, renderWidth * renderHeight * sizeof(float3));
-	}
-
-	cuCreateLens<<<gridSize, blockSize>>>(viewLens, renderWidth, renderHeight, true, 4);
-}
-
-
-
-
-
-
-
-
-
-
-
-float adx = 0.00;
-float ady = 0.00;
-
-
 void Renderer::renderFrame(cudaSurfaceObject_t pixels)
 {
 	 adx += 0.003f;
 	 ady += 0.003f;
+	float3 cameraPos = {0, 0, 0};		//put in scene
 
-	float3 cameraPos = {0, 0, 0};
-
-
-	unsigned int smem = sizeof(Sphere)*tcount;
-
-	cuRender<<<gridSize, blockSize, smem >>>(viewLens ,renderWidth, renderHeight, cameraPos, devslist, tcount, pixels,  adx,  ady, 7);
+	unsigned int smem = sizeof(Sphere)*tcount;		//to be replaced
+	cuRender<<<gridSize, blockSize, smem >>>(pixels, renderWidth, renderHeight, 3, cameraPos, devslist, tcount, adx,  ady);
 }
-
-
 
 Renderer::~Renderer(void)
 {
-	
+	delete[] slist;
+	cudaFree(devslist);
 }

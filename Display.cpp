@@ -28,7 +28,6 @@ void Display::createRenderer()
 {
 	render = Renderer();
 	render.setResolution(width, height);
-	render.createLens(width, height);
 }
 
 

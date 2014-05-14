@@ -2,6 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <CudaCompile Include="Renderer.cu" />
+    <CudaCompile Include="Action.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Timer.cpp">
@@ -28,5 +29,6 @@
     <None Include="MathOps.cuh">
       <Filter>Utilities</Filter>
     </None>
+    <None Include="Action.cuh" />
   </ItemGroup>
 </Project>

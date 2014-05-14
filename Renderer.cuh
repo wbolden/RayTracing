@@ -21,8 +21,8 @@ public:
 private:
 	bool orthographic;
 	int renderWidth, renderHeight;
-
-	float3* viewLens;
+	dim3 blockSize;
+	dim3 gridSize;
 };
 
 struct Sphere
