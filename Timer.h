@@ -8,19 +8,16 @@ public:
 	void start(void);
 	void stop(void);
 
-	long long getElapsed(void);
-	float getElapsedMS(void);
+	double getElapsed(void);
 	long long getFrameCount(void);
-	float getFPS(void);
+	double getFPS(void);
 
 	~Timer(void);
 
 private:
-	long long elapsedTime;
-	long long startTime;
+	double elapsedTime;
+	double startTime;
 	long long frameCount;
-
-	long long getMS(void);
 };
 
 #endif

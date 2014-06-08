@@ -18,7 +18,7 @@ void Display::initRenderTexture()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-
+	//GL_RGB
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	cudaGraphicsGLRegisterImage(&cudavResource, vtex, GL_TEXTURE_2D, cudaGraphicsRegisterFlagsWriteDiscard);
@@ -29,7 +29,6 @@ void Display::createRenderer()
 	render = Renderer();
 	render.setResolution(width, height);
 }
-
 
 
 void Display::displayFrame(GLFWwindow* window)

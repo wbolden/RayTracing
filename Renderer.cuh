@@ -1,9 +1,10 @@
-#ifndef RENDERER_H
+ #ifndef RENDERER_H
 #define RENDERER_H
 
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+
 
 class Renderer
 {
@@ -28,8 +29,10 @@ private:
 struct Sphere
 {
 	float3 position;
+	uchar4 color;
+	unsigned int texID;
 	float radius;
-	float reflectivity;
+	float reflectionWeight;
 };
 
 struct CameraInfo
@@ -38,5 +41,20 @@ struct CameraInfo
 	float3 viewpos;
 	float3 rotation;
 };
+
+
+struct contactInfo
+{
+	//int snum;
+	bool reflect;
+	bool refract;
+	uchar4 basicColor; 
+	float3 startPosition;
+	float3 normal;
+	float reflectionWeight;
+//	float3 rayDir;
+//	int snum;
+};
+
 
 #endif

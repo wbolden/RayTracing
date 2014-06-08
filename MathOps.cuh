@@ -3,6 +3,37 @@
 
 #include "device_launch_parameters.h"
 
+inline __device__ uchar4 operator*(const float &b, const uchar4 &a)
+{
+	return make_uchar4(a.x*b, a.y*b, a.z*b, 0xFF);
+}
+
+inline __device__ uchar4 operator*(const uchar4 &a,const float &b)
+{
+	return make_uchar4(a.x*b, a.y*b, a.z*b, 0xFF);
+}
+
+inline __device__ uchar4 operator+(const uchar4 &a,const uchar4 &b)
+{
+	return make_uchar4(a.x+b.x, a.y+b.y, a.z+b.z, 0xFF);
+}
+
+inline __device__ uchar4 operator-(const uchar4 &a,const uchar4 &b)
+{
+	return make_uchar4(a.x-b.x, a.y-b.y, a.z-b.z, 0xFF);
+}
+
+inline __device__ void operator+=(uchar4 a,const uchar4 &b)
+{
+	a = a+b;
+}
+
+inline __device__ void operator-=(uchar4 a,const uchar4 &b)
+{
+	a = a-b;
+}
+
+
 inline __device__ float3 operator-(const float3 &a, const float3 &b)
 {
 	return make_float3(a.x-b.x, a.y-b.y, a.z-b.z);
@@ -33,6 +64,11 @@ inline __device__ float3 operator*(const float3 &a, const float &b)
 	return make_float3(a.x*b, a.y*b, a.z*b);
 }
 
+inline __device__ float3 operator*(const float &b, const float3 &a)
+{
+	return make_float3(a.x*b, a.y*b, a.z*b);
+}
+
 inline __device__ void operator/=(float3 &a, const float &b)
 {
 	a = a/b;
@@ -42,6 +78,7 @@ inline __device__ void operator*=(float3 &a, const float &b)
 {
 	a = a*b;
 }
+
 
 //Returns the dot product of vectors a and b
 inline __device__ float dot(const float3 &a, const float3 &b)
@@ -79,21 +116,21 @@ inline __device__ float3 getRayDirection(float3 origin, float3 point)
 	return normalize(point - origin);
 }
 
-//Creates a hexadecimal RGBA color from 
-inline __device__ int rgb(int r, int g, int b, float intensity)
+inline __device__ float3 reflect(float3 incidentDirection, float3 normal)
 {
-	if(intensity >= 0)
-	{
-		return (((int)(r*intensity))<< 16) | (((int)(g*intensity))<< 8) | ((int)(b*intensity));
-	}else{
-		return 0;
-	}
+	return -2*(dot(incidentDirection, normal)*normal) + incidentDirection;
+}
+
+//Creates a hexadecimal RGBA color from 
+inline __device__ __host__ uchar4 rgb(int r, int g, int b)
+{
+	return make_uchar4(r, g, b, 0xFF);
 }   
 
-inline __device__ int rgbBlend(int r0, int g0, int b0, float intensity0, float weight0, int r1, int g1, int b1, float intensity1)
+inline __device__ __host__ uchar4 rgb(int c)
 {
-	return rgb(r0, g0, b0, intensity0*weight0) + rgb(r1, g1, b1, intensity1 * (1-weight0));
-}
+	return make_uchar4(c, c, c, 0xFF);
+}   
 
 //Returns the lambert coefficient of two direction vectors
 inline __device__ float lambert(float3 direction1, float3 direction2)

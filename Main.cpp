@@ -10,7 +10,7 @@
 #pragma comment(lib, "opengl32.lib")
 #pragma comment(lib, "glfw3.lib")
 
-#define WIDTH 800
+#define WIDTH 1600
 #define HEIGHT 600
 
 int main(int argc, char** argv) 

@@ -8,9 +8,6 @@
 
 
 
-
-
-
 __device__ void cuLight()
 {
 
@@ -33,7 +30,7 @@ __device__ void cuIntersection()
 
 __device__ unsigned int cuCastRay()
 {
-
+	return 0;
 }
 
 
@@ -117,9 +114,28 @@ __device__ bool shadowed(float3 rayOrigin, float3 rayDirection, float distance,f
 	return false;
 }
 
-__device__ void castRay(float3 start, float3 direction, Sphere* slist, int scount, unsigned int& out, float adx)
+__device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, int scount, float adx)
 {
-	float3 lightPos = {0 +200*__cosf(adx), 300+ 200*__cosf(adx), 300*__cosf(adx)};
+	contactInfo rval;
+	rval.reflect = false;
+
+	
+
+
+	float3 lightPos = {0 +100*__cosf(adx), 100, 100*__sinf(adx)};
+
+//	float3 lightPos = {0, 100, -200};
+
+
+
+
+
+	////////////////
+	rval.reflectionWeight = 0.6f;
+	////////////////
+
+
+
 
 
 	float d = -1;
@@ -144,34 +160,133 @@ __device__ void castRay(float3 start, float3 direction, Sphere* slist, int scoun
 
 		float3 snorm = getRayDirection(slist[snum].position, contactPoint);
 
+
+
+		//////
+		rval.startPosition = contactPoint;
+		rval.normal = snorm;
+		rval.reflectionWeight = slist[snum].reflectionWeight;
+		rval.reflectionWeight = 0.6f;
+		//////
+
+
+
 		float intensity = lambert(cray, snorm);	//Compute lambert intensity
 
 		for(int i = 0; i < scount; i++)
 		{												
 			if(shadowed(contactPoint, cray, dot(contactPoint - lightPos), slist[i].position, slist[i].radius	)) //add ray length parameter, for shadows ray length is distance to light
 			{
-				out = rgb(0xFF, 0xFF, 0xFF, intensity);	//Color in light
+				//out = rgb(0xFF, 0xFF, 0xFF, intensity);	//Color in light
+
+				if(intensity < 0.07)
+				{
+					intensity = 0.07;
+				}
+			//	out = rgb(0xFF, 0xFF, 0xFF)* intensity;
+
+//				out = slist[snum].color * intensity;
+
+				rval.basicColor = slist[snum].color * intensity;;
+				rval.reflect = true;
+				rval.reflectionWeight = slist[i].reflectionWeight;
 			}
 			else
 			{
-				out = 0x000000;		//Color in shadow
+				
+				//out = rgb(0, 0 ,0);		//Color in shadow
+
+//				out = slist[snum].color * 0.07f;
+
+
+
+				rval.basicColor = slist[snum].color * 0.07f;
+				rval.reflect = true;
+				rval.reflectionWeight = slist[i].reflectionWeight;
 				break;
 			}
 		}
 
+
+
+
 	}
 	else
 	{
-		out = 0x222222;		//Background color
+		rval.basicColor = rgb(0, 0, 0);		//Background color //0x222222
+		rval.reflect = false;
 	}
+
+
+	return rval;
 }
 //To be moved into cu... methods ^^^
 
-__device__ unsigned int cuRenderPixelAA(int pixelX, int pixelY, int width, int height, int aa,float3 position, Sphere* sharedslist, int scount, float adx) //adx to be removed
+__device__ uchar4 cuTraceRay(float3 startPosition, float3 startDirection, Sphere* sslist, int scount,float adx)
 {
-	unsigned int result;
+	
+	float3 dir = startDirection;
 
-	int rr = 0;
+	contactInfo inft;
+
+	inft = castRay(startPosition, dir, sslist, scount, adx);
+
+	if(false)
+	{
+
+		#define NUM 5
+
+		uchar4 rcols[NUM];
+		float rw[NUM];
+
+
+		int i = 0;
+
+		while(i < NUM)
+		{
+			rcols[i] = inft.basicColor;
+			rw[i] = inft.reflectionWeight;
+
+			if(inft.reflect)
+			{
+				dir = reflect(dir, inft.normal);
+				normalize(dir);
+
+				inft = castRay(inft.startPosition, dir, sslist, scount, adx);
+			}
+			else
+			{
+				break;
+			}
+
+			i++;
+		}
+
+	//	rcols[i] = inft.basicColor;
+	
+	//	rw[i] = inft.reflectionWeight;
+
+		i--;
+
+		while(i >0)
+		{
+			//rcols[i-1] = rcols[i-1]*(1-rw[i-1]) + rcols[i] * rw[i-1];
+			rcols[i-1] = rcols[i-1]*(1-0.6f) + rcols[i] * 0.6f;
+			i--;
+		}
+
+		return rcols[0];
+	}
+	else
+	{
+		return inft.basicColor;
+	}
+}
+
+__device__ uchar4 cuRenderPixelAA(int pixelX, int pixelY, int width, int height, int aa,float3 position, Sphere* sharedslist, int scount, float adx) //adx to be removed
+{
+	uchar4 result;
+
 
 	float offs = 0;
 
@@ -184,7 +299,9 @@ __device__ unsigned int cuRenderPixelAA(int pixelX, int pixelY, int width, int h
 		 offs = (int)aa/2;
 	}
 	 
-
+	int r = 0;
+	int g = 0;
+	int b = 0;
 	for(int ix = 0; ix < aa; ix++)
 	{
 		for(int iy = 0; iy < aa; iy++)
@@ -195,39 +312,50 @@ __device__ unsigned int cuRenderPixelAA(int pixelX, int pixelY, int width, int h
 			float normalizedX = (pixelX+aix/(1.5*offs) - 0.5*width)/(0.5*height);
 			float normalizedY = (pixelY+aiy/(1.5*offs)  - 0.5*height)/(0.5*height);
 
-			float3 lensLocation = {normalizedX, normalizedY, 1};
+			float3 lensLocation = {normalizedX, normalizedY, 1.5};
 
 			float3 dir = getRayDirection(make_float3(0, 0, 0), lensLocation);
 
-			castRay(position, dir, sharedslist, scount, result, adx);
+			result = cuTraceRay(position, dir, sharedslist, scount, adx);
 
-			rr += (result<<24) >> 24;
+			r += result.x;
+			g += result.y;
+			b += result.z;
 
 		}
 	}
-	rr /= aa*aa;
-	result = rgb(rr, rr, rr, 1);
+	r /= aa*aa;
+	g /= aa*aa;
+	b /= aa*aa;
+	result = rgb(r,g, b);
 	return result;
 }
 
-__device__ unsigned int cuRenderPixel(int pixelX, int pixelY, int width, int height, float3 position, Sphere* sharedslist, int scount, float adx) //adx to be removed
+__device__ uchar4 cuRenderPixel(int pixelX, int pixelY, int width, int height, float3 position, Sphere* sharedslist, int scount, float adx) //adx to be removed
 {
-	unsigned int result;
-	
 	float normalizedX = (pixelX - 0.5*width)/(0.5*height);
 	float normalizedY = (pixelY - 0.5*height)/(0.5*height);
 
-	float3 lensLocation = {normalizedX, normalizedY, 1};
+	float3 lensLocation = {normalizedX, normalizedY, 1.5};
 
+/*
+	int oldx = lensLocation.x;
+	int oldz = lensLocation.z;
+	int rrot = adx*10;
+	lensLocation.x = oldx * cosf(rrot) - oldz * sinf(rrot);
+	lensLocation.z = oldz * sinf(rrot) + oldx * cosf(rrot);
+*/
+
+	uchar4 result;
 	float3 dir = getRayDirection(make_float3(0, 0, 0), lensLocation);
 
-	castRay(position, dir, sharedslist, scount, result, adx);
+	result = cuTraceRay(position, dir, sharedslist, scount, adx);
 
 	return result;
 }
 
-__global__ void cuRender(cudaSurfaceObject_t out, int width, int height, int aa, float3 cameraPos, Sphere* slist, int scount, float adx, float ady)
-{
+__global__ void cuRender(cudaSurfaceObject_t out, int width, int height, int aa, float3 cameraPos, Sphere* slist, int scount, float adx, float ady, int renderOffset)
+{ 
 	extern __shared__ Sphere sharedslist[];
 
 	int x = blockDim.x * blockIdx.x + threadIdx.x;
@@ -235,42 +363,53 @@ __global__ void cuRender(cudaSurfaceObject_t out, int width, int height, int aa,
 
 	if(blockIdx.x *blockIdx.y ==1)
 	{
-		slist[0].position.x+=0.09;
+		slist[0].position.x = __sinf(adx) * 100;
+		slist[0].position.z = __cosf(adx) * 100;
+
+
+
+		//slist[2].position.x += 0.01;
+
+		slist[6].position.z += __sinf(adx);
+
+		//slist[6].radius += 0.5;
 	}
+
 
 	__syncthreads();
 
 	if(x < width && y < height)
 	{
-	
-		unsigned int index = y * width + x;
 		unsigned int tindex = threadIdx.x*blockDim.y +threadIdx.y;
 
 		if(tindex < scount)
 		{
-		//	sharedslist[tindex] = slist[tindex];
-
 			sharedslist[tindex].position = slist[tindex].position;
 			sharedslist[tindex].radius = slist[tindex].radius;
+
+
+
+			//////
+			sharedslist[tindex].reflectionWeight = slist[tindex].reflectionWeight;
+
+			sharedslist[tindex].color = slist[tindex].color;
+		//	sharedslist[tindex].color = rgb(0xFF);
+			/////
 		}
 		__syncthreads();
 
-		unsigned int result = 0;
-
-
-		float3 pos = {-0, 20, -100- adx*20};
-		
+		uchar4 result;
 
 		if(aa > 1)
 		{
-			result = cuRenderPixelAA(x, y, width, height, aa, pos, sharedslist, scount, adx);
+			result = cuRenderPixelAA(x, y, width, height, aa, cameraPos, sharedslist, scount, adx);
 		}
 		else
 		{
-			result = cuRenderPixel(x, y, width, height, pos, sharedslist, scount, adx);
+			result = cuRenderPixel(x, y, width, height, cameraPos, sharedslist, scount, adx);
 		}
 
-		surf2Dwrite(result, out, x * sizeof(unsigned int), y, cudaBoundaryModeClamp);
+		surf2Dwrite(result, out, renderOffset* sizeof(uchar4)+ x * sizeof(uchar4), y, cudaBoundaryModeClamp);
 	}
 }
 
@@ -286,35 +425,60 @@ float adx = 0.00;		//remove
 float ady = 0.00;		//remove
 Sphere* slist;
 Sphere* devslist;
-int tcount = 6;
+int tcount = 7;
 
 Renderer::Renderer(void)
 {
 
 	slist = new Sphere[tcount];
 
-	slist[0].position = make_float3(0, 0, 0);
+	slist[0].position = make_float3(200, 0, 0);
 	slist[0].radius = 30;
+	slist[0].reflectionWeight = 0.6f;
+	slist[0].color = rgb(0xFF);
 
-
-
-
-	slist[1].position = make_float3(0, -60, 0);
-	slist[1].radius = 10;
+	slist[1].position = make_float3(0, -0, 0);
+	slist[1].radius = 15;
+	slist[1].reflectionWeight = 0.6f;
+	slist[1].color = rgb(0xFF, 0, 0);
 
 	slist[2].position = make_float3(10, -30, 0);
 	slist[2].radius = 10;
+	slist[2].reflectionWeight = 0.6f;
+	slist[2].color = rgb(0, 0xFF, 0);
 
 	slist[3].position = make_float3(0, -40, 0);
 	slist[3].radius = 5;
+	slist[3].reflectionWeight = 0.6f;
+	slist[3].color = rgb(0xFF);
 
 	slist[4].position = make_float3(-0, -10000, 0);
 	slist[4].radius = 9960;
+	slist[4].reflectionWeight = 0.6f;
+	slist[4].color = rgb(0xFF);
+	
+//	slist[5].position = make_float3(20, -30, 0);
+//	slist[5].radius = 8;
 
-	slist[5].position = make_float3(20, -30, 0);
+	slist[5].position = make_float3(-0, 20, -210);
 	slist[5].radius = 8;
+	slist[5].reflectionWeight = 0.6f;
+	slist[5].color = rgb(0, 0, 0xFF);
+
+//	slist[6].position = make_float3(20, 500, 1000);
+//	slist[6].radius = 800;
+
+	slist[6].position = make_float3(0, 20000, -230); //20
+	slist[6].radius = 1000;
+	slist[6].reflectionWeight = 0.95f;
+	slist[6].color = rgb(0xFF);
 
 
+	for(int i = 0; i < tcount; i++)
+	{
+		slist[i].reflectionWeight = 1.0f;
+	}
+	
 
 	cudaMalloc((void**)&devslist, tcount * sizeof(Sphere));
 	cudaMemcpy(devslist, slist, tcount * sizeof(Sphere), cudaMemcpyHostToDevice);
@@ -338,14 +502,31 @@ void Renderer::setProjectionMode(bool orthographic)
 	this->orthographic = orthographic;
 }
 
+int ad = 0;
+int aa = 1;
+
 void Renderer::renderFrame(cudaSurfaceObject_t pixels)
 {
-	 adx += 0.003f;
-	 ady += 0.003f;
-	float3 cameraPos = {0, 0, 0};		//put in scene
+	 adx += 0.0045f;
+	// ady += 0.003f;
+	float3 cameraPos = {0, 20, -200};		//put in scene
 
+	 
 	unsigned int smem = sizeof(Sphere)*tcount;		//to be replaced
-	cuRender<<<gridSize, blockSize, smem >>>(pixels, renderWidth, renderHeight, 2, cameraPos, devslist, tcount, adx,  ady);
+
+
+	if(true) //3d
+	{
+		cameraPos.x -= 0.5f;
+		cuRender<<<gridSize, blockSize, smem >>>(pixels, renderWidth/2, renderHeight, aa, cameraPos, devslist, tcount, adx,  ady, 0);
+
+		cameraPos.x += 1;
+		cuRender<<<gridSize, blockSize, smem >>>(pixels, renderWidth/2, renderHeight, aa, cameraPos, devslist, tcount, adx,  ady, renderWidth/2);
+	}
+	else
+	{
+		cuRender<<<gridSize, blockSize, smem >>>(pixels, renderWidth, renderHeight, aa, cameraPos, devslist, tcount, adx,  ady, 0);
+	}
 }
 
 Renderer::~Renderer(void)
