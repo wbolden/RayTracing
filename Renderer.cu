@@ -35,8 +35,62 @@ __device__ unsigned int cuCastRay()
 
 
 //To be moved into cu... methods ___
-__device__ float intersection(float3 rayOrigin, float3 rayDirection, float distance,float3 position, float radius)
+__device__ float intersection(float3 rayOrigin, float3 rayDirection, float distance, float3 position, float radius)
 {
+	/*
+	float a = dot(rayDirection, rayDirection);
+	float b = 2 * dot(rayDirection, rayOrigin);
+	float c = dot(rayOrigin, rayOrigin) - radius * radius;
+
+	float disc = b*b -4 * a * c;
+
+	if(disc < 0)
+	{
+		return -1;
+	}
+
+	float distsqrt = sqrtf(disc);
+	float q;
+
+	if(b < 0)
+	{
+		q = (-b - distsqrt)/2.0f;
+	}
+	else
+	{
+		q = (-b + distsqrt)/2.0f;
+	}
+
+	float t0 = q/a;
+	float t1 = c/q;
+
+	float t;
+
+	if(t0 > t1)
+	{
+		float temp = t0;
+		t0 = t1;
+		t1 = temp;
+	}
+
+	if(t1 < 0)
+	{
+		return -1;
+	}
+
+	if(t0 < 0)
+	{
+		return t1;
+	}
+	else
+	{
+		return t0;
+	}
+
+
+	*/
+
+	
 	float3 dist = position - rayOrigin;
 
 	float b = dot(rayDirection, dist);
@@ -55,17 +109,29 @@ __device__ float intersection(float3 rayOrigin, float3 rayDirection, float dista
 	float t = distance;
 
 
-	if(t0 > 0.1 && t0 < t)
+	if(t0 < 0)
+	{
+		return t1;
+	}
+	else
+	{
+		return t0;
+	}
+
+	/*
+	if(t0 > 0.0 && t0 < t)
 	{
 		t = t0;
 	}
 
-	if(t1 > 0.1 && t1 < t)
+	if(t1 > 0.0 && t1 < t)
 	{
 		t = t1;
 	}
 
 	return t;
+	*/
+	
 }
 
 __device__ bool shadowed(float3 rayOrigin, float3 rayDirection, float distance,float3 position, float radius)
@@ -231,7 +297,7 @@ __device__ uchar4 cuTraceRay(float3 startPosition, float3 startDirection, Sphere
 
 	inft = castRay(startPosition, dir, sslist, scount, adx);
 
-	if(false)
+	if(true)
 	{
 
 		#define NUM 5
