@@ -137,6 +137,13 @@ inline __device__ float lambert(float3 direction1, float3 direction2)
 	return dot(direction1, direction2)/( magnitude(direction1) * magnitude(direction2) );
 }
 
+inline __device__ float frensel(float f0, float3 normal, float3 incidentDirection)
+{
+	float nv = 1 - dot(normal, -1*incidentDirection);
+
+	return f0 + (1 - f0)*(nv * nv * nv * nv * nv); //F(0)  + (1 - F(0))(1 - (n*v))^5
+}
+
 
 
 #endif

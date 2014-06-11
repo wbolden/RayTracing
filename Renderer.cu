@@ -147,8 +147,14 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 		rval.startPosition = contactPoint;
 		rval.normal = snorm;
 		rval.reflectionWeight = slist[snum].reflectionWeight;
-		rval.reflectionWeight = 0.6f;
-		//////
+
+		if(!(rval.reflectionWeight == 0))
+		{
+			rval.reflectionWeight = frensel(slist[snum].reflectionWeight, snorm, direction);
+		}
+		///////
+
+
 
 
 		float intensity = lambert(cray, snorm);	//Compute lambert intensity
@@ -157,32 +163,19 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 		{												
 			if(!shadowed(contactPoint, cray, dot(contactPoint - lightPos), slist[i].position, slist[i].radius)) //add ray length parameter, for shadows ray length is distance to light
 			{
-				//out = rgb(0xFF, 0xFF, 0xFF, intensity);	//Color in light
-
 				if(intensity < 0.07)
 				{
 					intensity = 0.07;
 				}
-			//	out = rgb(0xFF, 0xFF, 0xFF)* intensity;
-
-//				out = slist[snum].color * intensity;
 
 				rval.basicColor = slist[snum].color * intensity;;
 				rval.reflect = true;
-				rval.reflectionWeight = slist[snum].reflectionWeight;
 			}
 			else
 			{
-				
-				//out = rgb(0, 0 ,0);		//Color in shadow
-
-//				out = slist[snum].color * 0.07f;
-
-
-
 				rval.basicColor = slist[snum].color * 0.07f;
 				rval.reflect = true;
-				rval.reflectionWeight = slist[snum].reflectionWeight;
+
 				break;
 			}
 		}
@@ -210,21 +203,16 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 //ADD FRENSEL
 __device__ uchar4 cuTraceRay(float3 startPosition, float3 startDirection, Sphere* sslist, int scount,float adx)
 {
-	
 	float3 dir = startDirection;
-
 	contactInfo inft;
-
 	inft = castRay(startPosition, dir, sslist, scount, adx);
 
 	if(true)
 	{
-
-		#define NUM 30
+		#define NUM 5
 
 		uchar4 rcols[NUM];
 		float rw[NUM];
-
 
 		int i = 0;
 
@@ -248,15 +236,8 @@ __device__ uchar4 cuTraceRay(float3 startPosition, float3 startDirection, Sphere
 			i++;
 		}
 
-	//	rcols[i] = inft.basicColor;
-	
-	//	rw[i] = inft.reflectionWeight;
-
-	//	i--;
-
 		while(i >0)
 		{
-			//rcols[i-1] = rcols[i-1]*(1-rw[i-1]) + rcols[i] * rw[i-1];
 			rcols[i-1] = rcols[i-1]*(1-rw[i-1]) + rcols[i] * rw[i-1];
 			i--;
 		}
@@ -372,23 +353,8 @@ __global__ void cuRender(cudaSurfaceObject_t out, int width, int height, int aa,
 		{
 			sharedslist[tindex].position = slist[tindex].position;
 			sharedslist[tindex].radius = slist[tindex].radius;
-
-
-
-			//////
 			sharedslist[tindex].reflectionWeight = slist[tindex].reflectionWeight;
-			if(tindex == 0)
-			{
-				sharedslist[tindex].reflectionWeight = 1.0f;
-			}
-			else
-			{
-				sharedslist[tindex].reflectionWeight = 0.0f;
-			}
-
 			sharedslist[tindex].color = slist[tindex].color;
-		//	sharedslist[tindex].color = rgb(0xFF);
-			/////
 		}
 		__syncthreads();
 
@@ -428,12 +394,12 @@ Renderer::Renderer(void)
 
 	slist[0].position = make_float3(200, 0, 0);
 	slist[0].radius = 30;
-	slist[0].reflectionWeight = 0.6f;
+	slist[0].reflectionWeight = 0.1f;
 	slist[0].color = rgb(0xFF);
 
 	slist[1].position = make_float3(0, -0, 0);
 	slist[1].radius = 15;
-	slist[1].reflectionWeight = 0.6f;
+	slist[1].reflectionWeight = 0.0f;
 	slist[1].color = rgb(0xFF, 0, 0);
 
 	slist[2].position = make_float3(10, -30, 0);
@@ -443,12 +409,12 @@ Renderer::Renderer(void)
 
 	slist[3].position = make_float3(0, -40, 0);
 	slist[3].radius = 5;
-	slist[3].reflectionWeight = 0.6f;
+	slist[3].reflectionWeight = 0.0f;
 	slist[3].color = rgb(0xFF);
 
 	slist[4].position = make_float3(-0, -10000, 0);
 	slist[4].radius = 9960;
-	slist[4].reflectionWeight = 0.6f;
+	slist[4].reflectionWeight = 0.0f;
 	slist[4].color = rgb(0xFF);
 	
 //	slist[5].position = make_float3(20, -30, 0);
@@ -456,7 +422,7 @@ Renderer::Renderer(void)
 
 	slist[5].position = make_float3(-0, 20, -210);
 	slist[5].radius = 8;
-	slist[5].reflectionWeight = 0.6f;
+	slist[5].reflectionWeight = 0.0f;
 	slist[5].color = rgb(0, 0, 0xFF);
 
 //	slist[6].position = make_float3(20, 500, 1000);
@@ -464,15 +430,8 @@ Renderer::Renderer(void)
 
 	slist[6].position = make_float3(0, 20000, -230); //20
 	slist[6].radius = 1000;
-	slist[6].reflectionWeight = 0.95f;
+	slist[6].reflectionWeight = 0.0f;
 	slist[6].color = rgb(0xFF);
-
-
-	for(int i = 0; i < tcount; i++)
-	{
-		slist[i].reflectionWeight = 1.0f;
-	}
-	
 
 	cudaMalloc((void**)&devslist, tcount * sizeof(Sphere));
 	cudaMemcpy(devslist, slist, tcount * sizeof(Sphere), cudaMemcpyHostToDevice);
