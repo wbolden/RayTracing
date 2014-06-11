@@ -169,7 +169,7 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 
 				rval.basicColor = slist[snum].color * intensity;;
 				rval.reflect = true;
-				rval.reflectionWeight = slist[i].reflectionWeight;
+				rval.reflectionWeight = slist[snum].reflectionWeight;
 			}
 			else
 			{
@@ -182,7 +182,7 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 
 				rval.basicColor = slist[snum].color * 0.07f;
 				rval.reflect = true;
-				rval.reflectionWeight = slist[i].reflectionWeight;
+				rval.reflectionWeight = slist[snum].reflectionWeight;
 				break;
 			}
 		}
@@ -252,12 +252,12 @@ __device__ uchar4 cuTraceRay(float3 startPosition, float3 startDirection, Sphere
 	
 	//	rw[i] = inft.reflectionWeight;
 
-		i--;
+	//	i--;
 
 		while(i >0)
 		{
 			//rcols[i-1] = rcols[i-1]*(1-rw[i-1]) + rcols[i] * rw[i-1];
-			rcols[i-1] = rcols[i-1]*(1-0.6f) + rcols[i] * 0.6f;
+			rcols[i-1] = rcols[i-1]*(1-rw[i-1]) + rcols[i] * rw[i-1];
 			i--;
 		}
 
@@ -377,6 +377,14 @@ __global__ void cuRender(cudaSurfaceObject_t out, int width, int height, int aa,
 
 			//////
 			sharedslist[tindex].reflectionWeight = slist[tindex].reflectionWeight;
+			if(tindex == 0)
+			{
+				sharedslist[tindex].reflectionWeight = 1.0f;
+			}
+			else
+			{
+				sharedslist[tindex].reflectionWeight = 0.0f;
+			}
 
 			sharedslist[tindex].color = slist[tindex].color;
 		//	sharedslist[tindex].color = rgb(0xFF);
