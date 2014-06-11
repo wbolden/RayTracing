@@ -35,62 +35,8 @@ __device__ unsigned int cuCastRay()
 
 
 //To be moved into cu... methods ___
-__device__ float intersection(float3 rayOrigin, float3 rayDirection, float distance, float3 position, float radius)
+__device__ float intersection(float3 rayOrigin, float3 rayDirection, float3 position, float radius)
 {
-	/*
-	float a = dot(rayDirection, rayDirection);
-	float b = 2 * dot(rayDirection, rayOrigin);
-	float c = dot(rayOrigin, rayOrigin) - radius * radius;
-
-	float disc = b*b -4 * a * c;
-
-	if(disc < 0)
-	{
-		return -1;
-	}
-
-	float distsqrt = sqrtf(disc);
-	float q;
-
-	if(b < 0)
-	{
-		q = (-b - distsqrt)/2.0f;
-	}
-	else
-	{
-		q = (-b + distsqrt)/2.0f;
-	}
-
-	float t0 = q/a;
-	float t1 = c/q;
-
-	float t;
-
-	if(t0 > t1)
-	{
-		float temp = t0;
-		t0 = t1;
-		t1 = temp;
-	}
-
-	if(t1 < 0)
-	{
-		return -1;
-	}
-
-	if(t0 < 0)
-	{
-		return t1;
-	}
-	else
-	{
-		return t0;
-	}
-
-
-	*/
-
-	
 	float3 dist = position - rayOrigin;
 
 	float b = dot(rayDirection, dist);
@@ -101,13 +47,9 @@ __device__ float intersection(float3 rayOrigin, float3 rayDirection, float dista
 	{
 		return -1;
 	}
-
-
+	
 	float t0 = b -sqrt(d);
 	float t1 = b +sqrt(d);
-
-	float t = distance;
-
 
 	if(t0 < 0)
 	{
@@ -117,67 +59,40 @@ __device__ float intersection(float3 rayOrigin, float3 rayDirection, float dista
 	{
 		return t0;
 	}
-
-	/*
-	if(t0 > 0.0 && t0 < t)
-	{
-		t = t0;
-	}
-
-	if(t1 > 0.0 && t1 < t)
-	{
-		t = t1;
-	}
-
-	return t;
-	*/
-	
 }
 
-__device__ bool shadowed(float3 rayOrigin, float3 rayDirection, float distance,float3 position, float radius)
+__device__ bool shadowed(float3 rayOrigin, float3 rayDirection, float distanceToLight,float3 position, float radius)
 {
-	float3 dist = position - rayOrigin;
+	float3 distance = position - rayOrigin;
 
-	float ddist = dot(dist, dist);
+	float dotDistance = dot(distance, distance);
 
-	if(ddist > distance)
+	if(dotDistance > distanceToLight)
 	{
-		return true;
+		return false;
 	}
 
-	float b = dot(rayDirection, dist);
+	float b = dot(rayDirection, distance);
 
-	float d = b*b - ddist + radius * radius;
+	float d = b*b - dotDistance + radius * radius;
 
 	if(d < 0 )	//If the object is behind the ray, return
 	{
-		return true;
+		return false;
+	}
+	
+	float t = b -sqrtf(d); 
+
+	if(t < 0)
+	{
+		t =  b +sqrtf(d);
+		if(t < 0)
+		{
+			return false;
+		}
 	}
 
-
-
-	float t0 = b -sqrt(d);
-	float t1 = b +sqrt(d);
-
-
-
-	float t = distance*distance;
-
-	if(t0 > 0.1 && t0 < t)
-	{
-		t = t0;
-	}
-
-	if(t1 > 0.1 && t1 < t)
-	{
-		t = t1;
-	}
-
-	if(t >= distance*distance)
-	{
-		return true;
-	} 
-	return false;
+	return true;
 }
 
 __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, int scount, float adx)
@@ -209,7 +124,7 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 
 	for(int i = 0; i < scount; i++)
 	{
-		float td = intersection(start, direction, 100000, slist[i].position, slist[i].radius);
+		float td = intersection(start, direction, slist[i].position, slist[i].radius);
 		if((d < 0 || td < d) && td > 0)
 		{
 			d = td;
@@ -218,15 +133,15 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 		
 	}
 
-	if(d > 0)
+	d-= 0.05f; //Accounts for floating point errors (prevents the contact point from being inside an object)
+
+	if(snum > -1)
 	{
 		float3 contactPoint = start +direction*d;
 
 		float3 cray = getRayDirection(contactPoint, lightPos);
 
 		float3 snorm = getRayDirection(slist[snum].position, contactPoint);
-
-
 
 		//////
 		rval.startPosition = contactPoint;
@@ -236,12 +151,11 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 		//////
 
 
-
 		float intensity = lambert(cray, snorm);	//Compute lambert intensity
 
 		for(int i = 0; i < scount; i++)
 		{												
-			if(shadowed(contactPoint, cray, dot(contactPoint - lightPos), slist[i].position, slist[i].radius	)) //add ray length parameter, for shadows ray length is distance to light
+			if(!shadowed(contactPoint, cray, dot(contactPoint - lightPos), slist[i].position, slist[i].radius)) //add ray length parameter, for shadows ray length is distance to light
 			{
 				//out = rgb(0xFF, 0xFF, 0xFF, intensity);	//Color in light
 
@@ -280,6 +194,9 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 	else
 	{
 		rval.basicColor = rgb(0, 0, 0);		//Background color //0x222222
+		//rval.basicColor = rgb(126,192,238);
+
+
 		rval.reflect = false;
 	}
 
@@ -288,6 +205,9 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 }
 //To be moved into cu... methods ^^^
 
+
+
+//ADD FRENSEL
 __device__ uchar4 cuTraceRay(float3 startPosition, float3 startDirection, Sphere* sslist, int scount,float adx)
 {
 	
@@ -300,7 +220,7 @@ __device__ uchar4 cuTraceRay(float3 startPosition, float3 startDirection, Sphere
 	if(true)
 	{
 
-		#define NUM 5
+		#define NUM 30
 
 		uchar4 rcols[NUM];
 		float rw[NUM];
