@@ -1,10 +1,23 @@
 #include "Renderer.cuh"
-#include "MathOps.cuh"
 #include "cuda.h"
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include "Utilities.cuh"
 
 #include <stdio.h>
+
+struct contactInfo
+{
+	//int snum;
+	bool reflect;
+	bool refract;
+	uchar4 basicColor; 
+	float3 startPosition;
+	float3 normal;
+	float reflectionWeight;
+//	float3 rayDir;
+//	int snum;
+};
 
 
 
@@ -98,26 +111,25 @@ __device__ bool shadowed(float3 rayOrigin, float3 rayDirection, float distanceTo
 __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, int scount, float adx)
 {
 	contactInfo rval;
-	rval.reflect = false;
-
 	
 
+	float3 lightPos = {0 +100*__cosf(adx), 500, 100*__sinf(adx)};
 
-	float3 lightPos = {0 +100*__cosf(adx), 100, 100*__sinf(adx)};
+	#define NOM 50
 
-//	float3 lightPos = {0, 100, -200};
+	PointLight lpos[NOM];
 
+	for(int i = 0; i < NOM; i++)
+	{
+		lpos[i].position = make_float3(500+i*2 * __cosf(0+i), 1000, 500 +2*i * __sinf(0+i));
 
+		//lpos[i].position = make_float3(-200 + i*8, 100, 0);
+		lpos[i].color = rgb(0xFF);
+	}
 
-
-
-	////////////////
-	rval.reflectionWeight = 0.6f;
-	////////////////
-
-
-
-
+	
+//	lpos[0].color = rgb(0xFF, 0, 0);
+//	lpos[1].color = rgb(0, 0, 0xFF);
 
 	float d = -1;
 	int snum = -1;
@@ -139,7 +151,7 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 	{
 		float3 contactPoint = start +direction*d;
 
-		float3 cray = getRayDirection(contactPoint, lightPos);
+//		float3 cray = getRayDirection(contactPoint, lightPos);
 
 		float3 snorm = getRayDirection(slist[snum].position, contactPoint);
 
@@ -148,47 +160,73 @@ __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, in
 		rval.normal = snorm;
 		rval.reflectionWeight = slist[snum].reflectionWeight;
 
-		if(!(rval.reflectionWeight == 0))
+		if(rval.reflectionWeight == 0)
+		{
+			rval.reflect = false;
+		}
+		else
 		{
 			rval.reflectionWeight = frensel(slist[snum].reflectionWeight, snorm, direction);
+			rval.reflect = true;
 		}
 		///////
 
 
+//		float3 cray = getRayDirection(contactPoint, lightPos);
 
+//		float intensity = lambert(cray, snorm);	//Compute lambert intensity
+
+		int sc = 0;
+		float tint = 0;
+		int r=0, g=0, b=0;
+
+		for(int s = 0; s < NOM; s++)
+		{
+		float3 cray = getRayDirection(contactPoint, lpos[s].position);
 
 		float intensity = lambert(cray, snorm);	//Compute lambert intensity
-
+		float inten = 0.07f;
+		bool uc = true;
 		for(int i = 0; i < scount; i++)
-		{												
-			if(!shadowed(contactPoint, cray, dot(contactPoint - lightPos), slist[i].position, slist[i].radius)) //add ray length parameter, for shadows ray length is distance to light
+		{								
+			//float inten = 0.07f;
+			if(!shadowed(contactPoint, cray, dot(contactPoint - lpos[s].position), slist[i].position, slist[i].radius)) //add ray length parameter, for shadows ray length is distance to light
 			{
 				if(intensity < 0.07)
 				{
 					intensity = 0.07;
 				}
 
-				rval.basicColor = slist[snum].color * intensity;;
-				rval.reflect = true;
+				rval.basicColor = slist[snum].color * intensity;
+				inten = intensity;
 			}
 			else
 			{
 				rval.basicColor = slist[snum].color * 0.07f;
-				rval.reflect = true;
-
+				inten = 0.07f;
+				uc = false;
 				break;
 			}
+
+			//tint += inten;
+
 		}
+		tint += inten;
+		if(uc){
+		r += lpos[s].color.x;
+		g += lpos[s].color.y;
+		b += lpos[s].color.z;
+		}
+		}
+		tint /= NOM;
+	
 
-
-
-
+		rval.basicColor = saturate(slist[snum].color,rgb(r/NOM, g/NOM, b/NOM)) * tint;
 	}
 	else
 	{
-		rval.basicColor = rgb(0, 0, 0);		//Background color //0x222222
-		//rval.basicColor = rgb(126,192,238);
-
+		//rval.basicColor = rgb(0, 0, 0);		//Background color //0x222222
+		rval.basicColor = rgb(126,192,238);
 
 		rval.reflect = false;
 	}
@@ -211,8 +249,8 @@ __device__ uchar4 cuTraceRay(float3 startPosition, float3 startDirection, Sphere
 	{
 		#define NUM 5
 
-		uchar4 rcols[NUM];
-		float rw[NUM];
+		uchar4 rcols[NUM+1];
+		float rw[NUM+1];
 
 		int i = 0;
 
@@ -235,6 +273,9 @@ __device__ uchar4 cuTraceRay(float3 startPosition, float3 startDirection, Sphere
 
 			i++;
 		}
+		rcols[i] = inft.basicColor;
+		rw[i] = inft.reflectionWeight;
+
 
 		while(i >0)
 		{
@@ -333,11 +374,11 @@ __global__ void cuRender(cudaSurfaceObject_t out, int width, int height, int aa,
 		slist[0].position.x = __sinf(adx) * 100;
 		slist[0].position.z = __cosf(adx) * 100;
 
-
+		slist[0].position.y = __cosf(adx*1.35f) * 35;
 
 		//slist[2].position.x += 0.01;
 
-		slist[6].position.z += __sinf(adx);
+		//slist[6].position.z += __sinf(adx);
 
 		//slist[6].radius += 0.5;
 	}
@@ -385,7 +426,7 @@ float adx = 0.00;		//remove
 float ady = 0.00;		//remove
 Sphere* slist;
 Sphere* devslist;
-int tcount = 7;
+int tcount = 6;
 
 Renderer::Renderer(void)
 {
@@ -394,12 +435,12 @@ Renderer::Renderer(void)
 
 	slist[0].position = make_float3(200, 0, 0);
 	slist[0].radius = 30;
-	slist[0].reflectionWeight = 0.1f;
+	slist[0].reflectionWeight = 0.6f;
 	slist[0].color = rgb(0xFF);
 
-	slist[1].position = make_float3(0, -0, 0);
+	slist[1].position = make_float3(-20, -30, 0); 
 	slist[1].radius = 15;
-	slist[1].reflectionWeight = 0.0f;
+	slist[1].reflectionWeight = 0.4f;
 	slist[1].color = rgb(0xFF, 0, 0);
 
 	slist[2].position = make_float3(10, -30, 0);
@@ -416,22 +457,12 @@ Renderer::Renderer(void)
 	slist[4].radius = 9960;
 	slist[4].reflectionWeight = 0.0f;
 	slist[4].color = rgb(0xFF);
-	
-//	slist[5].position = make_float3(20, -30, 0);
-//	slist[5].radius = 8;
 
-	slist[5].position = make_float3(-0, 20, -210);
-	slist[5].radius = 8;
+	slist[5].position = make_float3(4, 20, -210);
+	slist[5].radius = 9.9;
 	slist[5].reflectionWeight = 0.0f;
 	slist[5].color = rgb(0, 0, 0xFF);
 
-//	slist[6].position = make_float3(20, 500, 1000);
-//	slist[6].radius = 800;
-
-	slist[6].position = make_float3(0, 20000, -230); //20
-	slist[6].radius = 1000;
-	slist[6].reflectionWeight = 0.0f;
-	slist[6].color = rgb(0xFF);
 
 	cudaMalloc((void**)&devslist, tcount * sizeof(Sphere));
 	cudaMemcpy(devslist, slist, tcount * sizeof(Sphere), cudaMemcpyHostToDevice);

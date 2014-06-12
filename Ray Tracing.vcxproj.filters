@@ -26,9 +26,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="MathOps.cuh">
+    <None Include="Action.cuh" />
+    <None Include="Utilities.cuh">
       <Filter>Utilities</Filter>
     </None>
-    <None Include="Action.cuh" />
   </ItemGroup>
 </Project>

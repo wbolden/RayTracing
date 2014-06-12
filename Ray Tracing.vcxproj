@@ -40,7 +40,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Action.cuh" />
-    <None Include="MathOps.cuh" />
+    <None Include="Utilities.cuh" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{C879591F-9C27-4EA5-847E-4CE7B7C49E96}</ProjectGuid>

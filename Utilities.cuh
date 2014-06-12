@@ -1,7 +1,29 @@
-#ifndef MATHOPS_CUH
-#define MATHOPS_CUH
+#ifndef UTILITIES_CUH
+#define UTILITIES_CUH
 
 #include "device_launch_parameters.h"
+struct Sphere
+{
+	float3 position;
+	uchar4 color;
+	unsigned int texID;
+	float radius;
+	float reflectionWeight;
+};
+
+struct PointLight
+{
+	float3 position;
+	uchar4 color;
+	float intensity;
+};
+
+struct CameraInfo
+{
+	float3 position;
+	float3 viewpos;
+	float3 rotation;
+};
 
 inline __device__ uchar4 operator*(const float &b, const uchar4 &a)
 {
@@ -142,6 +164,32 @@ inline __device__ float frensel(float f0, float3 normal, float3 incidentDirectio
 	float nv = 1 - dot(normal, -1*incidentDirection);
 
 	return f0 + (1 - f0)*(nv * nv * nv * nv * nv); //F(0)  + (1 - F(0))(1 - (n*v))^5
+}
+
+inline __device__ float3 snell(float ni, float nt, float3 normal, float3 incidentDirection)
+{
+	float mu = ni/nt;
+	float dotnv = dot(normal, -1*incidentDirection);
+
+	return mu*incidentDirection - normal*(mu*dotnv + sqrtf(1-mu*mu*(1 - (dotnv*dotnv)))); //mu(v) - (mu(n * v) + sqrt(1 - mu^2 (1 - (n * v)^2)))
+}
+
+inline __device__ uchar4 saturate(uchar4 c1, uchar4 c2)
+{
+	return rgb((c1.x*c2.x)/0xFF, (c1.y*c2.y)/0xFF, (c1.z*c2.z)/0xFF);
+}
+
+inline __device__ float rand(unsigned int* seed)
+{
+	unsigned long a = 16807;
+	unsigned long m = 2147483647;
+	unsigned long x = (unsigned long)*seed;
+
+	x = (a * x)%m;
+
+	*seed = (unsigned int) x;
+
+	return ((float)x)/m;
 }
 
 
