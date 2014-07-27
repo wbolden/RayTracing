@@ -47,7 +47,12 @@ void Display::displayFrame(GLFWwindow* window)
 	cudaSurfaceObject_t cudavSurfaceObject;
 	cudaCreateSurfaceObject(&cudavSurfaceObject, &cudavArrayResourceDesc);
 
+
+//	cudaGraphicsUnmapResources(1, &cudavResource);
 	render.renderFrame(cudavSurfaceObject);
+
+
+
 
 	//Unmap resources
 	cudaDestroySurfaceObject(cudavSurfaceObject);

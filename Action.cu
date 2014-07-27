@@ -78,15 +78,15 @@ ActionHandler::ActionHandler(Sphere* devslist, PointLight* devpllist, int* scout
 }
 
 
-float adx = 0;
+float addx = 0;
 void ActionHandler::update(Sphere* slist, PointLight* pllist, int scount, int lcount)
 {
-	adx += 0.0045f;
+	addx += 0.0045f;
 
 
 	int blockSize = 256;
 
 	int gridSize = (scount + lcount + blockSize -1)/blockSize;
 
-	cuUpdate<<<gridSize, gridSize>>>(slist, pllist, scount, lcount, adx);
+	cuUpdate<<<gridSize, gridSize>>>(slist, pllist, scount, lcount, addx);
 }

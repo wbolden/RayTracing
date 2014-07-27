@@ -19,6 +19,16 @@ struct contactInfo
 //	int snum;
 };
 
+struct intersectionInfo
+{
+
+};
+
+struct lightingInfo
+{
+
+};
+
 
 
 __device__ void cuLight()
@@ -41,8 +51,20 @@ __device__ void cuIntersection()
 
 }
 
-__device__ unsigned int cuCastRay()
+__device__ unsigned int cuCastRay(float3 start, float3 direction, Sphere* slist, int scount, float adx)
 {
+	//find nearest intersection
+	float d;
+	int snum;
+
+//	closestIntersection(slist, scount, start, direction, &d, &snum);
+
+	//Determine how much the point is lit; diffuse color and intensity [0, 1]
+
+	//Determine reflected ray direction, if any
+
+	//Determine refracted ray direction, if any
+
 	return 0;
 }
 
@@ -106,6 +128,26 @@ __device__ bool shadowed(float3 rayOrigin, float3 rayDirection, float distanceTo
 	}
 
 	return true;
+}
+
+__device__ void closestIntersection(Sphere* slist, int scount, float3& start, float3& direction, float* distance, int* objectNumber)
+{
+	float d = -1;
+	int snum = -1;
+
+	for(int i = 0; i < scount; i++)
+	{
+		float td = intersection(start, direction, slist[i].position, slist[i].radius);
+		if((d < 0 || td < d) && td > 0)
+		{
+			d = td;
+			snum = i;
+		}
+		
+	}
+
+	*distance = d;
+	*objectNumber = snum;
 }
 
 __device__ contactInfo castRay(float3 start, float3 direction, Sphere* slist, int scount, float adx)
@@ -295,18 +337,9 @@ __device__ uchar4 cuRenderPixelAA(int pixelX, int pixelY, int width, int height,
 {
 	uchar4 result;
 
-
 	float offs = 0;
-
-	if(aa % 2 == 0)
-	{
-		 offs = aa;//finish
-	}
-	else
-	{
-		 offs = (int)aa/2;
-	}
-	 
+	offs = aa/2;
+	
 	int r = 0;
 	int g = 0;
 	int b = 0;
@@ -321,7 +354,6 @@ __device__ uchar4 cuRenderPixelAA(int pixelX, int pixelY, int width, int height,
 			float normalizedY = (pixelY+aiy/(1.5*offs)  - 0.5*height)/(0.5*height);
 
 			float3 lensLocation = {normalizedX, normalizedY, 1.5};
-
 			float3 dir = getRayDirection(make_float3(0, 0, 0), lensLocation);
 
 			result = cuTraceRay(position, dir, sharedslist, scount, adx);
@@ -336,25 +368,18 @@ __device__ uchar4 cuRenderPixelAA(int pixelX, int pixelY, int width, int height,
 	g /= aa*aa;
 	b /= aa*aa;
 	result = rgb(r,g, b);
+
 	return result;
 }
 
 __device__ uchar4 cuRenderPixel(int pixelX, int pixelY, int width, int height, float3 position, Sphere* sharedslist, int scount, float adx) //adx to be removed
 {
+	uchar4 result;
+
 	float normalizedX = (pixelX - 0.5*width)/(0.5*height);
 	float normalizedY = (pixelY - 0.5*height)/(0.5*height);
 
 	float3 lensLocation = {normalizedX, normalizedY, 1.5};
-
-/*
-	int oldx = lensLocation.x;
-	int oldz = lensLocation.z;
-	int rrot = adx*10;
-	lensLocation.x = oldx * cosf(rrot) - oldz * sinf(rrot);
-	lensLocation.z = oldz * sinf(rrot) + oldx * cosf(rrot);
-*/
-
-	uchar4 result;
 	float3 dir = getRayDirection(make_float3(0, 0, 0), lensLocation);
 
 	result = cuTraceRay(position, dir, sharedslist, scount, adx);
@@ -375,12 +400,6 @@ __global__ void cuRender(cudaSurfaceObject_t out, int width, int height, int aa,
 		slist[0].position.z = __cosf(adx) * 100;
 
 		slist[0].position.y = __cosf(adx*1.35f) * 35;
-
-		//slist[2].position.x += 0.01;
-
-		//slist[6].position.z += __sinf(adx);
-
-		//slist[6].radius += 0.5;
 	}
 
 
